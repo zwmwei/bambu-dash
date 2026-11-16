@@ -10,6 +10,8 @@
 
 > 上图是实机截图：P2S 上的打印任务"鸟笼挂顶秋千可动版"已完成，105 层。
 
+**第一次用？** 直接看 [QUICKSTART.md](QUICKSTART.md) —— 三步跑起来，不需要读这份文档。
+
 ## 能看什么
 
 | 项目 | 说明 |
@@ -57,10 +59,16 @@ ffmpeg 的原话带回来，照着提 issue 即可。
 
 ## 一、网页版（最快）
 
-双击 `start.bat`，或者在命令行里：
+| 系统 | 启动方式 |
+|---|---|
+| Windows | 双击 `start.bat` |
+| macOS / Linux | 在项目目录执行 `./start.sh` |
+
+两个脚本都会自动检查 Node.js、首次运行时自动 `npm install`，然后启动服务并打开浏览器。
+也可以在命令行里手动跑：
 
 ```bash
-node bridge/server.js
+cd bridge && npm install && node server.js
 ```
 
 然后打开 `http://localhost:8848`。手机连同一个 WiFi，访问启动时打印的那个
