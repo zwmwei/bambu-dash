@@ -12,11 +12,16 @@ services:
     container_name: bambu-dash
     restart: unless-stopped
 
-    # 用 host 网络，主要为了「自动发现打印机」：
-    #   SSDP 靠 UDP 广播 239.255.255.250:2021 找设备，
-    #   Docker 默认的 bridge 网络收不到局域网广播应答，发现按钮会一直转圈。
-    # 状态 / 控制 / 摄像头都只是容器往外连打印机，两种网络都通。
-    # host 模式下不需要写 ports，容器直接占用宿主机 8848。
+    # 用 host 网络：省掉端口映射，容器直接占用宿主机 8848。
+    #
+    # 历史上这里是为了 SSDP 广播发现（bridge 网络收不到 UDP 广播应答），
+    # 但实测 P2S 根本不响应 SSDP，现在改成了「扫本网段 8883 端口」——
+    # 那是出站 TCP，bridge 网络照样能扫。所以现在换成 bridge 也完全可行：
+    #   删掉 network_mode: host，改成 ports: ["8848:8848"]
+    #
+    # 保留 host 的另一个好处是「扫描时看得到宿主机真实网卡」：
+    # 容器内 os.networkInterfaces() 拿到 enp3s0 这类物理网卡，
+    # 而不是 docker0 的 172.17.x，网段判断更准。
     network_mode: host
 
     environment:

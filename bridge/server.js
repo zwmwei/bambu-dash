@@ -19,12 +19,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const dgram = require('dgram');
 const os = require('os');
 
 const mqtt = require('mqtt');
 const { WebSocketServer } = require('ws');
 const cam = require('./cam');
+const discover = require('./discover');
 
 const PORT = parseInt(process.env.PORT || '8848', 10);
 const WEB_DIR = path.join(__dirname, '..', 'web');
@@ -301,46 +301,19 @@ function getSession(cfg) {
 }
 
 /* ------------------------------------------------------------------ */
-/* SSDP 发现                                                            */
+/* 局域网发现                                                           */
 /* ------------------------------------------------------------------ */
-function discover(timeoutMs = 4000) {
-  return new Promise((resolve) => {
-    const found = new Map();
-    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    const msg = Buffer.from(
-      'M-SEARCH * HTTP/1.1\r\n' +
-      'HOST: 239.255.255.250:2021\r\n' +
-      'MAN: "ssdp:discover"\r\n' +
-      'MX: 3\r\n' +
-      'ST: urn:bambu.com:device:Printer:1\r\n\r\n'
-    );
+// 原来这里用 SSDP（239.255.255.250:2021）广播找打印机，但实测 P2S 完全
+// 不回应，mDNS 也没有广播。现在改为扫 8883 端口 + 读 TLS 设备证书，
+// 顺带能把序列号一起拿到。实现和原因见 discover.js 顶部注释。
+let lastScan = null;      // { at, result } 短时缓存，避免连点重复扫
 
-    sock.on('message', (buf, rinfo) => {
-      const txt = buf.toString('utf8');
-      if (!/bambu|3DPrinter/i.test(txt)) return;
-      const get = (k) => {
-        const m = new RegExp('^' + k + ':[ \\t]*(.+)$', 'mi').exec(txt);
-        return m ? m[1].trim() : '';
-      };
-      const serial = get('USN') || get('DevSerial\\.bambu\\.com');
-      found.set(rinfo.address, {
-        ip: rinfo.address,
-        name: get('DevName\\.bambu\\.com') || get('DevName') || 'Bambu 打印机',
-        model: get('DevModel\\.bambu\\.com') || get('DevModel') || '',
-        serial: serial.replace(/^uuid:/i, '').replace(/:.*$/, '')
-      });
-    });
-    sock.on('error', () => { });
-    sock.bind(() => {
-      try { sock.setBroadcast(true); } catch (e) {}
-      try { sock.send(msg, 0, msg.length, 2021, '239.255.255.250'); } catch (e) {}
-      setTimeout(() => {
-        const arr = Array.from(found.values());
-        try { sock.close(); } catch (e) {}
-        resolve(arr);
-      }, timeoutMs);
-    });
-  });
+async function findPrinters(prefix) {
+  const now = Date.now();
+  if (!prefix && lastScan && now - lastScan.at < 30000) return lastScan.result;
+  const result = await discover.scan({ prefix: prefix || '' });
+  if (!prefix) lastScan = { at: Date.now(), result };
+  return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -349,10 +322,30 @@ function discover(timeoutMs = 4000) {
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true);
 
+  // 扫局域网找打印机：?prefix=192.168.1 可指定网段，不传则用本机网段
   if (u.pathname === '/api/discover') {
-    const list = await discover();
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, printers: list }));
+    if (MOCK) {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        ok: true, printers: [], scanned: 0, ms: 0, mock: true,
+        subnets: []
+      }));
+      return;
+    }
+    try {
+      const prefix = String(u.query.prefix || '').trim();
+      if (prefix && !/^\d{1,3}(\.\d{1,3}){1,2}$/.test(prefix)) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: '网段格式应为 192.168.1', printers: [] }));
+        return;
+      }
+      const result = await findPrinters(prefix);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: '扫描失败：' + e.message, printers: [] }));
+    }
     return;
   }
 
