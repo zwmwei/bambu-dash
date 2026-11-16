@@ -26,6 +26,7 @@ public class CamOverlay extends FrameLayout implements SurfaceHolder.Callback {
     private RtspTunnel tunnel;
     private MediaPlayer player;
     private String pendingUrl;
+    private volatile int session = 0;
 
     public CamOverlay(Context c) {
         super(c);
@@ -68,7 +69,7 @@ public class CamOverlay extends FrameLayout implements SurfaceHolder.Callback {
     }
 
     /** 打开摄像头：ip 是打印机的，code 是访问码 */
-    public void open(String ip, String code) {
+    public void open(final String ip, String code) {
         hideOnlyPlayer();
         setVisibility(VISIBLE);
         tip.setText("连接摄像头…");
@@ -76,18 +77,65 @@ public class CamOverlay extends FrameLayout implements SurfaceHolder.Callback {
         // 画面是 16:9，横过来看更实用；看板本身仍是竖屏
         setActivityOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
-        try {
-            tunnel = new RtspTunnel(ip, 322, "bblp", code);
-            tunnel.start();
-            pendingUrl = tunnel.localUrl();
-        } catch (Exception e) {
-            tip.setText("启动失败：" + e.getMessage());
-            return;
-        }
+        final String accessCode = code;
+        final int mySession = ++session;
 
-        if (surface.getHolder().getSurface() != null && surface.getHolder().getSurface().isValid()) {
-            playPending();
+        // 先探一下 322 端口：IP 填错（比如填成了 NAS 地址）时立刻说明白，
+        // 否则 MediaPlayer 只会干等十几秒再丢一个 (1/-2147483648) 的玄学错误码。
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String why = probe(ip, 322);
+                if (mySession != session) return;          // 用户已经关掉了
+                if (why != null) {
+                    setTip("连不上摄像头（" + ip + ":322）\n" + why +
+                            "\n\n若状态正常说明 IP 没错，请确认「局域网模式」已允许实况。");
+                    return;
+                }
+                setTip("握手…");
+                try {
+                    tunnel = new RtspTunnel(ip, 322, "bblp", accessCode);
+                    tunnel.start();
+                    pendingUrl = tunnel.localUrl();
+                } catch (Exception e) {
+                    setTip("启动失败：" + e.getMessage());
+                    return;
+                }
+                post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mySession != session) return;
+                        if (surface.getHolder().getSurface() != null
+                                && surface.getHolder().getSurface().isValid()) {
+                            playPending();
+                        }
+                    }
+                });
+            }
+        }, "cam-probe").start();
+    }
+
+    /** 返回 null 表示端口通，否则返回一句人话原因 */
+    private static String probe(String ip, int port) {
+        java.net.Socket s = null;
+        try {
+            s = new java.net.Socket();
+            s.connect(new java.net.InetSocketAddress(ip, port), 1800);
+            return null;
+        } catch (java.net.SocketTimeoutException e) {
+            return "端口没有响应，可能不是这台设备的地址";
+        } catch (Exception e) {
+            return "端口被拒绝，这个 IP 大概不是打印机";
+        } finally {
+            try { if (s != null) s.close(); } catch (Exception ignored) { }
         }
+    }
+
+    private void setTip(final String msg) {
+        post(new Runnable() {
+            @Override
+            public void run() { tip.setText(msg); }
+        });
     }
 
     public void hide() {
@@ -109,6 +157,7 @@ public class CamOverlay extends FrameLayout implements SurfaceHolder.Callback {
     }
 
     private void hideOnlyPlayer() {
+        session++;                 // 让还在探测中的线程作废
         pendingUrl = null;
         if (player != null) {
             try { player.stop(); } catch (Exception ignored) { }
@@ -141,7 +190,9 @@ public class CamOverlay extends FrameLayout implements SurfaceHolder.Callback {
             });
             player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 public boolean onError(MediaPlayer mp, int what, int extra) {
-                    tip.setText("播放失败（" + what + " / " + extra + "）\n可尝试在电脑上开网页版查看");
+                    tip.setText("播放失败（" + what + " / " + extra + "）\n"
+                            + "端口是通的，多为访问码不对或打印机忙\n"
+                            + "可先在电脑上开网页版对比一下");
                     return true;
                 }
             });

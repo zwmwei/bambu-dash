@@ -102,6 +102,62 @@ public class MainActivity extends Activity implements BambuClient.Sink {
             if (c != null) c.publishCommand(json);
         }
 
+        /* ---- 局域网扫描：APK 里没有桥接服务，直接用原生 TCP+TLS 扫 8883 ---- */
+
+        private volatile boolean scanBusy = false;
+
+        @JavascriptInterface
+        public void scanLan() {
+            if (scanBusy) return;
+            scanBusy = true;
+            LanScan.scan(new LanScan.Cb() {
+                @Override
+                public void onProgress(int done, int total, JSONObject hit) {
+                    try {
+                        JSONObject o = new JSONObject();
+                        o.put("type", "progress");
+                        o.put("done", done);
+                        o.put("total", total);
+                        if (hit != null) o.put("hit", hit);
+                        pushScan(o);
+                    } catch (Exception ignored) { }
+                }
+
+                @Override
+                public void onDone(JSONObject r) {
+                    scanBusy = false;
+                    try {
+                        JSONObject o = new JSONObject();
+                        o.put("type", "done");
+                        o.put("ok", r.optBoolean("ok", false));
+                        o.put("ms", r.optLong("ms", 0));
+                        if (r.has("error")) o.put("error", r.optString("error"));
+                        if (r.optJSONArray("subnets") != null) o.put("subnets", r.optJSONArray("subnets"));
+                        if (r.optJSONArray("printers") != null) o.put("printers", r.optJSONArray("printers"));
+                        pushScan(o);
+                    } catch (Exception ignored) { }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean scanSupported() {
+            return true;
+        }
+
+        private void pushScan(JSONObject o) {
+            final String s = o.toString();
+            if (web == null) return;
+            web.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        web.evaluateJavascript("window.__onScan&&window.__onScan(" + JSONObject.quote(s) + ")", null);
+                    } catch (Exception ignored) { }
+                }
+            });
+        }
+
         @JavascriptInterface
         public void saveConfig(String ip, String code, String serial, String model) {
             sp.edit()

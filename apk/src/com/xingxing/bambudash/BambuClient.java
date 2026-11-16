@@ -118,9 +118,19 @@ public class BambuClient {
 
     private String prettyError(Exception e) {
         String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-        if (m.contains("Connection refused")) return "打印机拒绝连接，确认已开启「局域网模式」";
-        if (m.contains("timed out") || m.contains("ETIMEDOUT")) return "连接超时，检查 IP 是否在同一局域网";
-        if (m.contains("Trust anchor") || m.contains("handshake")) return "TLS 握手失败，检查访问码是否正确";
+        // 拒绝连接 = 这个 IP 上根本没有 8883 服务。最常见的错是把 NAS / 电脑 / 路由器
+        // 的地址当成打印机了，所以文案要说清 IP，并指向「扫描局域网」。
+        if (m.contains("ECONNREFUSED") || m.contains("Connection refused")) {
+            return ip + ":8883 端口没开 —— 这个地址大概不是打印机（不是 NAS、不是路由器）";
+        }
+        if (m.contains("ETIMEDOUT") || m.contains("timed out") || m.contains("timeout")) {
+            return "连 " + ip + " 超时 —— 手机和打印机不在同一局域网，或被路由器的 AP 隔离挡住";
+        }
+        if (m.contains("Trust anchor") || m.contains("handshake") || m.contains("SSL")) {
+            return "TLS 握手失败 —— 检查访问码是否与打印机屏幕上的完全一致";
+        }
+        if (m.contains("访问码") || m.contains("未授权")) return m;
+        if (m.contains("No route")) return "找不到到 " + ip + " 的路由，检查手机是否连了 WiFi";
         return m;
     }
 

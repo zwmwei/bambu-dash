@@ -1029,6 +1029,8 @@
     connect: function (cfg) {
       this.stop();
       S.model = cfg.model || '';
+      S.lastMsg = 0;          // 新一轮连接：重置「有没有收到过数据」
+      S.lastError = null;
       if (window.AndroidBridge && window.AndroidBridge.connect) {
         this.mode = 'native';
         // 原生层只认 ip/code/serial 三个参数，多传会抛异常
@@ -1079,6 +1081,8 @@
     }
   };
 
+  var lastCfgAuto = 0;   // 上次因连接失败自动弹出设置面板的时间
+
   function handleBridge(msg) {
     if (msg.type === 'status' && msg.print) {
       applyStatus(msg.print);
@@ -1088,8 +1092,16 @@
       render();
     } else if (msg.type === 'error') {
       S.lastError = msg.message || '连接失败';
-      if (sheet.classList.contains('open')) setCfgMsg(S.lastError);
       S.online = false;
+      if (sheet.classList.contains('open')) {
+        setCfgMsg(S.lastError);
+      } else if (S.cfg && !S.lastMsg && Date.now() - lastCfgAuto > 6000) {
+        // 一次都没连上就把设置面板弹回来：错误原因 + 「扫描局域网」都在这个面板里，
+        // 比只在底部留一行灰字有用得多（最常见的错是 IP 填成了 NAS 或路由器）
+        lastCfgAuto = Date.now();
+        openCfg();
+        setCfgMsg(S.lastError);
+      }
       render();
     } else if (msg.type === 'log') {
       console.log('[bridge]', msg.message);
@@ -1217,27 +1229,117 @@
   function closeCfg() { sheet.classList.remove('open'); }
 
   /* ---------- 扫描局域网 ---------- */
-  // 服务端 /api/discover 扫本网段的 8883 端口，并对开放的端口读一次 TLS
-  // 设备证书 —— 拓竹证书的 CN 就是序列号，所以 IP 和序列号能一起拿到。
-  // 走 SSDP 广播那条路在 P2S 上实测没有响应，所以没采用。
+  // 两条路：
+  //  · 网页版 → 服务端 /api/discover，扫本网段 8883 端口并读 TLS 证书拿序列号
+  //  · APK   → 原生 LanScan（同一套逻辑的 Java 版），结果走 __onScan 回调
+  // 走 SSDP 广播在 P2S 上实测毫无响应，所以没采用。
   var scanBusy = false;
+  var nativeHits = [];
+
+  function scanBtn(on, label) {
+    var btn = $('btnScan');
+    btn.disabled = on;
+    btn.classList.toggle('busy', on);
+    btn.textContent = label;
+  }
+
+  function scanEmpty(tip, subnets) {
+    $('scanList').innerHTML = '<div class="scan-note">' + esc(tip) + ' 依次确认：<br>' +
+      '· 打印机屏幕 → 设置 → 网络，已打开<b>局域网模式</b><br>' +
+      '· 这台设备和打印机在同一网段（当前扫描 <b>' +
+      esc((subnets || []).join('、') || '本机网段') + '</b>）<br>' +
+      '· 路由器没开 AP 隔离或访客网络' +
+      (window.AndroidBridge ? '<br>· 手机连的是 <b>WiFi</b>，不是只用流量' : '') + '</div>';
+  }
+
+  // 画出「进度条 + 已发现的打印机」
+  function renderNativeScan(progressText) {
+    var list = $('scanList');
+    list.innerHTML = '';
+    var head = document.createElement('div');
+    head.className = 'scan-note';
+    head.style.marginTop = '0';
+    head.innerHTML = progressText;
+    list.appendChild(head);
+    nativeHits.forEach(function (p) { list.appendChild(scanItem(p)); });
+  }
+
+  function scanItem(p) {
+    var el = document.createElement('div');
+    el.className = 'scan-item';
+    var sub = p.serial ? '序列号 ' + p.serial : (p.issuer ? esc(p.issuer) : '序列号未识别');
+    el.innerHTML =
+      '<div><div class="si-ip">' + esc(p.ip) + '</div>' +
+      '<div class="si-sub">' + sub + '</div></div>' +
+      '<div class="si-go">使用</div>';
+    el.onclick = function () {
+      $('inIp').value = p.ip;
+      if (p.serial) $('inSerial').value = p.serial;
+      setCfgMsg('');
+      $('scanList').innerHTML = '<div class="scan-note">已填入 ' + esc(p.ip) +
+        (p.serial ? '，序列号也一起填好了' : '') + '。填好访问码后点「连接」。</div>';
+      $('inCode').focus();
+    };
+    return el;
+  }
+
+  // ---- APK 原生扫描 ----
+  function nativeScanStart() {
+    if (scanBusy) return;
+    scanBusy = true;
+    nativeHits = [];
+    scanBtn(true, '扫描中…');
+    renderNativeScan('正在扫描局域网…（约 3~6 秒）');
+    try {
+      window.AndroidBridge.scanLan();
+    } catch (e) {
+      scanBusy = false;
+      scanBtn(false, '重新扫描');
+      $('scanList').innerHTML = '<div class="scan-note">扫描启动失败：' + esc(e.message || e) + '</div>';
+    }
+  }
+
+  window.__onScan = function (str) {
+    var d;
+    try { d = JSON.parse(str); } catch (e) { return; }
+    if (d.type === 'progress') {
+      if (d.hit) { nativeHits.push(d.hit); }
+      renderNativeScan('正在扫描 <b>' + d.done + '</b> / ' + d.total + ' 个地址…' +
+        (nativeHits.length ? ' 已找到 <b>' + nativeHits.length + '</b> 台' : ''));
+      return;
+    }
+    if (d.type !== 'done') return;
+    scanBusy = false;
+    scanBtn(false, '重新扫描');
+    if (!d.ok) {
+      $('scanList').innerHTML = '<div class="scan-note">扫描失败：' + esc(d.error || '未知错误') + '</div>';
+      return;
+    }
+    if (!nativeHits.length) { scanEmpty('没找到打印机。', d.subnets); return; }
+    renderNativeScan('找到 <b>' + nativeHits.length + '</b> 台 · 用时 ' +
+      ((d.ms || 0) / 1000).toFixed(1) + ' 秒 · 点一下自动填入');
+  };
 
   $('btnScan').onclick = function () {
     if (scanBusy) return;
     var list = $('scanList');
-    var btn = $('btnScan');
 
-    // APK 里是 file:// 协议，没有服务端可扫
-    if (!(location.protocol === 'http:' || location.protocol === 'https:')) {
-      list.innerHTML = '<div class="scan-note">自动扫描需要网页版（通过桥接服务打开）。' +
-        '在 App 里请直接填打印机 IP。</div>';
+    // ① APK：原生扫描（file:// 下没有服务端）
+    if (window.AndroidBridge && window.AndroidBridge.scanSupported && window.AndroidBridge.scanSupported()) {
+      nativeScanStart();
       return;
     }
 
+    // ② 不是 http(s)：既没服务端也调不到原生，只能手填
+    if (!(location.protocol === 'http:' || location.protocol === 'https:')) {
+      list.innerHTML = '<div class="scan-note">当前打开方式不支持自动扫描，请手动填打印机 IP' +
+        '（打印机屏幕 → 设置 → 网络）。</div>';
+      return;
+    }
+
+    // ③ 网页版：走服务端
     scanBusy = true;
-    btn.disabled = true;
-    btn.classList.add('busy');
-    btn.textContent = '扫描中…';
+    scanBtn(true, '扫描中…');
     list.innerHTML = '<div class="scan-note">正在扫描本网段的 254 个地址，约 3~5 秒…</div>';
 
     fetch('api/discover', { cache: 'no-store' })
@@ -1249,40 +1351,14 @@
             esc((d && d.error) || '未知错误') + '</div>';
           return;
         }
-        if (!d.printers || !d.printers.length) {
-          list.innerHTML = '<div class="scan-note">没找到打印机。依次确认：<br>' +
-            '· 打印机屏幕 → 设置 → 网络，已打开<b>局域网模式</b><br>' +
-            '· 这台设备和打印机在同一网段（当前扫描 <b>' +
-            esc((d.subnets || []).join('、') || '本机网段') + '.*</b>）<br>' +
-            '· 路由器没开 AP 隔离或访客网络</div>';
-          return;
-        }
+        if (!d.printers || !d.printers.length) { scanEmpty('没找到打印机。', d.subnets); return; }
         var head = document.createElement('div');
         head.className = 'scan-note';
         head.style.marginTop = '0';
         head.innerHTML = '找到 <b>' + d.printers.length + '</b> 台 · 用时 ' +
           (d.ms / 1000).toFixed(1) + ' 秒 · 点一下自动填入';
         list.appendChild(head);
-        d.printers.forEach(function (p) {
-          var el = document.createElement('div');
-          el.className = 'scan-item';
-          var sub = p.serial ? '序列号 ' + p.serial : '序列号未识别';
-          if (p.issuer) sub += ' · ' + p.issuer;
-          el.innerHTML =
-            '<div><div class="si-ip">' + esc(p.ip) + '</div>' +
-            '<div class="si-sub">' + esc(sub) + '</div></div>' +
-            '<div class="si-go">使用</div>';
-          el.onclick = function () {
-            $('inIp').value = p.ip;
-            if (p.serial) $('inSerial').value = p.serial;
-            setCfgMsg('');
-            list.innerHTML = '<div class="scan-note">已填入 ' + esc(p.ip) +
-              (p.serial ? '，序列号也一起填好了' : '') +
-              '。填好访问码后点「连接」。</div>';
-            $('inCode').focus();
-          };
-          list.appendChild(el);
-        });
+        d.printers.forEach(function (p) { list.appendChild(scanItem(p)); });
       })
       .catch(function (e) {
         list.innerHTML = '<div class="scan-note">扫描失败：' +
@@ -1290,9 +1366,7 @@
       })
       .finally(function () {
         scanBusy = false;
-        btn.disabled = false;
-        btn.classList.remove('busy');
-        btn.textContent = '重新扫描';
+        scanBtn(false, '重新扫描');
       });
   };
 
