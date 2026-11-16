@@ -55,17 +55,23 @@ cp .env.example .env
 vi .env        # 或者用 nano
 ```
 
-`.env` 里就三行：
+`.env` 里就这几行：
 
 ```bash
 PRINTER_IP=192.168.1.100     # 打印机在局域网里的 IP
 PRINTER_CODE=xxxxxxxx        # 8 位访问码
 PRINTER_SERIAL=              # 可选，填了启动更快，不填也能自动识别
+PRINTER_MODEL=P2S            # 可选，型号；留空按通用配置
 ```
 
 - `PRINTER_IP`：打印机屏幕 → 设置 → 网络
 - `PRINTER_CODE`：同一页往下，「局域网模式(LAN Only)」那一块
 - `PRINTER_SERIAL`：序列号，可选
+- `PRINTER_MODEL`：机型，可选。可选值 `P2S` `P1S` `P1P` `X1C` `X1E` `X2D` `A1` `A1M` `A2L` `H2D` `H2S` `H2C`
+
+> **关于 `PRINTER_MODEL`**：状态和控制各机型通用，这个值只影响显示名和摄像头通道。
+> P1 / A1 / A2 系列的摄像头走 6000 端口 JPEG 推流，与 P2S 不是同一套协议，
+> 当前版本看不了画面；P1P 没有摄像头。详见 README 的「支持的机型」。
 
 `.env` 已经被 `.gitignore` 排除，不会进仓库；访问码只留在 NAS 上，
 **不会下发到浏览器**。
@@ -168,6 +174,7 @@ host 模式下**不需要写端口映射**，容器直接占用宿主机 8848。
 | `online` 一直是 false | IP 错了 / 打印机没开机 / NAS 不同网段 / 访问码填错 |
 | 页面一直显示「演示模式」 | `/api/config` 没拿到预置配置：检查 compose 里 `PRINTER_IP` 是否为空 |
 | 摄像头 503「未连接打印机」 | 容器还没连上打印机，等几秒；或 compose 里的 IP 不对 |
+| 摄像头 501 / 提示「通道未适配」 | 型号选成了 P1 / A1 / A2 系列（6000 端口 JPEG 推流，尚未适配），或 P1P（无摄像头）。改 `.env` 里的 `PRINTER_MODEL` 后 `docker compose up -d` |
 | 摄像头 504「摄像头无画面」 | 先看返回的正文，里面带了 ffmpeg 的原话，见下面「ffmpeg 版本差异」 |
 | 端口占用起不来 | 改 `PORT`（如 8849），访问地址跟着变 |
 | 构建时 apt 卡住 | 检查 `APT_MIRROR` 那行；海外环境删掉它走官方源 |

@@ -30,6 +30,9 @@ services:
       PRINTER_IP: ${PRINTER_IP:?请先在 .env 里填打印机 IP}
       PRINTER_CODE: ${PRINTER_CODE:?请先在 .env 里填 8 位访问码}
       PRINTER_SERIAL: ${PRINTER_SERIAL:-}
+      # 机型：只影响显示名和摄像头通道，可留空
+      # P2S P1S P1P X1C X1E X2D A1 A1M A2L H2D H2S H2C
+      PRINTER_MODEL: ${PRINTER_MODEL:-}
 
     # 想看容器内日志时间对得上，也方便排障
     logging:

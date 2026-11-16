@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 /**
- * Bambu P2S 看板 · 局域网桥接服务
+ * 拓竹（Bambu Lab）打印机看板 · 局域网桥接服务
  *
  * 作用：打印机只开放 MQTT over TLS (8883)，浏览器无法直接连，
  *       这里做 MQTT -> WebSocket 的中转，同时托管看板页面。
  *
+ * 状态与控制命令在各机型之间是通用的（P1/X1/P2/A/H2 都用同一套 topic）；
+ * 唯一有实质差异的是摄像头通道，见 cam.js 里的 MODEL_CAM。
+ *
  * 用法：
  *   node server.js              # 正常模式
  *   node server.js --mock       # 模拟数据模式（无需打印机）
- *   PORT=8848 node server.js
+ *   PORT=8848 PRINTER_IP=... PRINTER_CODE=... PRINTER_MODEL=P2S node server.js
  */
 'use strict';
 
@@ -35,7 +38,9 @@ const MOCK = process.argv.includes('--mock');
 const PRESET = {
   ip: (process.env.PRINTER_IP || '').trim(),
   code: (process.env.PRINTER_CODE || '').trim(),
-  serial: (process.env.PRINTER_SERIAL || '').trim()
+  serial: (process.env.PRINTER_SERIAL || '').trim(),
+  // 型号只影响显示名和摄像头通道，留空按未指定处理
+  model: (process.env.PRINTER_MODEL || '').trim().toUpperCase()
 };
 
 const MIME = {
@@ -246,12 +251,12 @@ class MockSession {
         bed_temper: 59.8 + Math.sin(t / 5) * 0.4,
         bed_target_temper: 60,
         chamber_temper: 31.5 + Math.sin(t / 9) * 0.6,
-        subtask_name: 'Benchy_P2S_0.2mm_PLA.3mf',
+        subtask_name: 'Benchy_' + (PRESET.model || 'P2S') + '_0.2mm_PLA.3mf',
         wifi_signal: '-49dBm',
         print_error: 0,
         spd_lvl: 2,
         cooling_fan_speed: '70',
-        machine_type: 'P2S',
+        machine_type: PRESET.model || 'P2S',
         ams: {
           tray_now: '0',
           ams: [{
@@ -283,13 +288,15 @@ function getSession(cfg) {
     if (!session) session = new MockSession();
     return session;
   }
-  const changed = !session || !session.cfg || session.cfg.ip !== cfg.ip ||
-    session.cfg.code !== cfg.code || (session.cfg.serial || '') !== (cfg.serial || '');
-  if (changed) {
-    if (session) session.teardown();
-    session = new PrinterSession(cfg);
-    session.start();
+  // 只是换了型号：摄像头通道跟着变，但 MQTT 连接没必要断掉重建
+  if (session && session.cfg && session.cfg.ip === cfg.ip && session.cfg.code === cfg.code &&
+      (session.cfg.serial || '') === (cfg.serial || '')) {
+    if (cfg.model) session.cfg.model = cfg.model;
+    return session;
   }
+  if (session) session.teardown();
+  session = new PrinterSession(cfg);
+  session.start();
   return session;
 }
 
@@ -358,7 +365,8 @@ const server = http.createServer(async (req, res) => {
       cam: cam.available(),
       autoConnect: !!PRESET.ip,      // 有 IP 就能连（访问码由服务端兜底）
       ip: PRESET.ip,
-      serial: PRESET.serial
+      serial: PRESET.serial,
+      model: PRESET.model            // 空字符串 = 未指定，前端用下拉的默认值
     }));
     return;
   }
@@ -366,7 +374,8 @@ const server = http.createServer(async (req, res) => {
   if (u.pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({
-      ok: true, mock: MOCK, cam: cam.available(),
+      ok: true, mock: MOCK, cam: cam.available(), model: PRESET.model,
+      camChannel: cam.channelOf(session && session.cfg),
       session: session ? { serial: session.serial, online: session.connected, ip: session.cfg && session.cfg.ip } : null
     }));
     return;
@@ -381,7 +390,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' });
       res.end(jpg);
     } catch (e) {
-      res.writeHead(504, { 'Content-Type': 'text/plain; charset=utf-8' });
+      const code = e.code === 'CAM_UNSUPPORTED' ? 501 : 504;
+      res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('摄像头抓帧失败：' + e.message);
     }
     return;
@@ -429,11 +439,12 @@ wss.on('connection', (ws) => {
       const ip = (msg.ip || PRESET.ip || '').trim();
       const code = (msg.code || PRESET.code || '').trim();
       const serial = (msg.serial || PRESET.serial || '').trim();
+      const model = (msg.model || PRESET.model || '').trim().toUpperCase();
       if (!ip || !code) {
         send(ws, { type: 'error', message: '缺少 IP 或访问码' });
         return;
       }
-      sess = getSession({ ip, code, serial });
+      sess = getSession({ ip, code, serial, model });
       sess.attach(ws);
     } else if (msg.type === 'command') {
       if (sess) sess.command(msg.payload);
@@ -461,18 +472,20 @@ server.listen(PORT, '0.0.0.0', () => {
 
   // 预置了凭据就主动连上：这样摄像头接口和 /api/health 不依赖浏览器先连
   if (PRESET.ip && !MOCK) {
-    try { getSession({ ip: PRESET.ip, code: PRESET.code, serial: PRESET.serial }); } catch (e) {}
+    try { getSession({ ip: PRESET.ip, code: PRESET.code, serial: PRESET.serial, model: PRESET.model }); } catch (e) {}
   }
 
   console.log('');
   console.log('  ╭──────────────────────────────────────────────╮');
-  console.log('  │  Bambu P2S 看板 · 桥接服务                    │');
+  console.log('  │  拓竹打印机看板 · 桥接服务                    │');
   console.log('  ╰──────────────────────────────────────────────╯');
   console.log('');
   console.log('  本机访问   http://localhost:' + PORT);
   ips.forEach((ip) => console.log('  手机访问   http://' + ip + ':' + PORT));
   console.log('');
   console.log('  模式       ' + (MOCK ? '模拟数据（--mock）' : '真实打印机 MQTT/TLS 8883'));
+  console.log('  机型       ' + (PRESET.model ? PRESET.model + '（摄像头通道 ' + cam.channelOf({ model: PRESET.model }) + '）'
+    : '未指定（页面里可选，摄像头按 rtsps 尝试）'));
   console.log('  页面目录   ' + WEB_DIR);
   console.log('  预置凭据   ' + (PRESET.ip
     ? PRESET.ip + '（访问码' + (PRESET.code ? '已配置' : '缺失') + '，打开页面自动连接）'

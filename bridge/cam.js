@@ -1,12 +1,19 @@
 'use strict';
 /**
- * 摄像头通道：P2S 内置摄像头走 RTSPS 322（TLS），
- * 浏览器不能直接拉 RTSP，这里用 ffmpeg 转成 MJPEG。
+ * 摄像头通道。
+ *
+ * 拓竹各代机型的内置摄像头走的不是同一套协议，分两族：
+ *   · rtsps  —— X / P2 / H2 / X2 系列。322 端口 RTSPS（TLS + Digest），
+ *               ffmpeg 直接能拉，本项目已适配。P2S 实测 1920x1080 @ 30fps。
+ *   · jpeg   —— P1 / A1 / A2 系列。6000 端口推 JPEG 帧流，协议不同，
+ *               **本项目尚未适配**（作者手上只有 P2S，没法实测验证）。
+ *   · none   —— 无内置摄像头（P1P）。
+ *
+ * 只有 P2S 是实测过的机型，其余型号按同系列协议推断，
+ * 首次使用若不通，请把错误信息贴到 issue。
  *
  *   /api/cam.jpg    抓单帧（APK / WebView 用轮询）
  *   /api/cam.mjpg   MJPEG 长连接（普通浏览器 <img> 直接能播）
- *
- * 实测 P2S 是 1920x1080 @ 30fps，比 P1S 的 0.5fps 强得多。
  *
  * ── 关于 -tls_verify（踩过的坑）────────────────────────────────
  * 打印机用的是自签证书，必须不校验。但两个 ffmpeg 版本的行为是相反的：
@@ -18,6 +25,40 @@
  * 所以按主版本号自适应，另外抓帧失败时再看一眼错误信息兜底。
  */
 const { spawn, spawnSync } = require('child_process');
+
+/**
+ * 机型 → 摄像头通道。型号 id 与前端 web/index.html 里的 MODELS 表一致。
+ * 没收录的型号按 'rtsps' 处理（新一代机型基本都走这条路）。
+ */
+const MODEL_CAM = {
+  X1C: 'rtsps', X1E: 'rtsps', X2D: 'rtsps',
+  P2S: 'rtsps',
+  P1S: 'jpeg', P1P: 'none',
+  A1: 'jpeg', A1M: 'jpeg', A2L: 'jpeg',
+  H2D: 'rtsps', H2S: 'rtsps', H2C: 'rtsps'
+};
+
+/** 型号 → 通道；未指定型号时按 rtsps 试 */
+function channelOf(cfg) {
+  const m = String((cfg && cfg.model) || '').trim().toUpperCase();
+  if (!m || m === 'AUTO') return 'rtsps';
+  return MODEL_CAM[m] || 'rtsps';
+}
+
+const CAM_UNSUPPORTED = {
+  jpeg: 'P1 / A1 / A2 系列的摄像头走 6000 端口 JPEG 推流，与本项目已适配的 RTSPS 322 是两种协议，' +
+        '当前版本尚未适配。状态与控制不受影响。',
+  none: '该机型（P1P）没有内置摄像头。'
+};
+
+/** 型号不支持时抛错，返回 null 表示可以继续 */
+function guardChannel(cfg) {
+  const ch = channelOf(cfg);
+  if (ch === 'rtsps') return null;
+  const e = new Error(CAM_UNSUPPORTED[ch] || '该机型摄像头通道未适配');
+  e.code = 'CAM_UNSUPPORTED';
+  return e;
+}
 
 let FFMPEG;          // undefined=未探测, ''=不可用, 其他=路径
 let FFMAJOR = -1;    // -1=未探测, 0=没解析出来, N=主版本号
@@ -82,6 +123,8 @@ function commonArgs(cfg) {
 
 /** 抓单帧，返回 JPEG Buffer（遇到 tls_verify 不兼容时自动去掉参数重试一次） */
 function snapshot(cfg, width) {
+  const bad = guardChannel(cfg);
+  if (bad) return Promise.reject(bad);
   return shot(cfg, width).catch((e) => {
     if (TLS_OFF && /tls_verify/i.test(e.message)) {
       TLS_OFF = false;
@@ -137,6 +180,9 @@ function shot(cfg, width) {
 
 /** MJPEG 长连接：把 ffmpeg 输出的连续 JPEG 按帧切给浏览器 */
 function stream(cfg, req, res, opts) {
+  const bad = guardChannel(cfg);
+  if (bad) { res.writeHead(501, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end(bad.message); return null; }
+
   const exe = findFfmpeg();
   if (!exe) { res.writeHead(503); res.end('ffmpeg 不可用'); return null; }
 
@@ -201,4 +247,4 @@ function stream(cfg, req, res, opts) {
   return { kill };
 }
 
-module.exports = { available, snapshot, stream, findFfmpeg };
+module.exports = { available, snapshot, stream, findFfmpeg, channelOf, MODEL_CAM };

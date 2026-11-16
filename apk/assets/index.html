@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0a0d10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>P2S 看板</title>
+<title>拓竹打印机看板</title>
 <style>
   :root{
     --bg:#0a0d10;
@@ -265,13 +265,21 @@
   .sheet-in .hint{font-size:12px;color:var(--dim);line-height:1.6;margin:0 0 18px}
   .field{margin-bottom:13px}
   .field label{display:block;font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.6px;margin-bottom:6px;text-transform:uppercase}
-  .field input{
+  .field input,.field select{
     width:100%;background:#0d1218;border:1px solid var(--line);border-radius:11px;
     padding:11px 12px;color:var(--txt);font-size:15px;font-family:inherit;
     outline:none;transition:border-color .2s;letter-spacing:.5px;
   }
-  .field input:focus{border-color:rgba(0,193,106,.55)}
+  .field select{
+    appearance:none;-webkit-appearance:none;cursor:pointer;
+    padding-right:34px;
+    background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%237d8b99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;background-size:11px;
+  }
+  .field select option,.field select optgroup{background:#0d1218;color:var(--txt)}
+  .field input:focus,.field select:focus{border-color:rgba(0,193,106,.55)}
   .field input::placeholder{color:var(--dim2)}
+  .field .sub2{font-size:11px;color:var(--dim2);margin-top:6px;line-height:1.55}
   .sheet-in .row{display:flex;gap:9px;margin-top:18px}
   .sheet-in .row .btn{flex:1;padding:13px}
   .sheet-msg{font-size:12px;color:var(--red);margin-top:10px;min-height:16px;font-weight:600}
@@ -288,7 +296,7 @@
     <div class="brand">
       <span class="dot" id="linkDot"></span>
       <div style="min-width:0">
-        <div class="name" id="devName">P2S 看板</div>
+        <div class="name" id="devName">拓竹打印机看板</div>
         <div class="sub" id="devSub">未连接</div>
       </div>
     </div>
@@ -382,7 +390,7 @@
     <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.2c1.6 1.5 1.6 3.6 0 5.1M12 20.8c-1.6-1.5-1.6-3.6 0-5.1M3.2 12c1.5-1.6 3.6-1.6 5.1 0M20.8 12c-1.5 1.6-3.6 1.6-5.1 0"/></svg></div><div class="txt"><div class="mk">风扇</div><div class="mv num" id="metaFan">—</div></div></div>
     <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19v-3M9.3 19v-6M14.7 19V9.5M20 19V5"/></svg></div><div class="txt"><div class="mk">信号</div><div class="mv num" id="metaWifi">—</div></div></div>
     <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13.5 3 5 13.8h5.2L9.8 21l8.6-10.9h-5.2z"/></svg></div><div class="txt"><div class="mk">速度</div><div class="mv" id="metaSpeed">—</div></div></div>
-    <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 4.5v5"/></svg></div><div class="txt"><div class="mk">机型</div><div class="mv" id="metaModel">P2S</div></div></div>
+    <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 4.5v5"/></svg></div><div class="txt"><div class="mk">机型</div><div class="mv" id="metaModel">—</div></div></div>
   </section>
 
   <div class="ctrl" id="ctrlBox">
@@ -411,6 +419,38 @@
       同一页面还能看到 IP 地址。
     </p>
     <div class="field">
+      <label>打印机型号</label>
+      <select id="inModel">
+        <option value="">未指定（按通用配置连接）</option>
+        <optgroup label="P 系列">
+          <option value="P2S">P2S · 实测可用</option>
+          <option value="P1S">P1S · 摄像头待适配</option>
+          <option value="P1P">P1P · 无摄像头</option>
+        </optgroup>
+        <optgroup label="X 系列">
+          <option value="X1C">X1 Carbon</option>
+          <option value="X1E">X1E</option>
+          <option value="X2D">X2D</option>
+        </optgroup>
+        <optgroup label="A 系列">
+          <option value="A1">A1 · 摄像头待适配</option>
+          <option value="A1M">A1 mini · 摄像头待适配</option>
+          <option value="A2L">A2L · 摄像头待适配</option>
+        </optgroup>
+        <optgroup label="H 系列">
+          <option value="H2D">H2D</option>
+          <option value="H2S">H2S</option>
+          <option value="H2C">H2C</option>
+        </optgroup>
+        <optgroup label="其他">
+          <option value="OTHER">其他机型（按通用配置）</option>
+        </optgroup>
+      </select>
+      <div class="sub2" id="modelTip">
+        状态与控制各机型通用；摄像头只有 P2S 实测过，其他型号若不通欢迎反馈。
+      </div>
+    </div>
+    <div class="field">
       <label>打印机 IP</label>
       <input id="inIp" placeholder="192.168.1.100" inputmode="decimal" autocomplete="off" spellcheck="false">
     </div>
@@ -434,6 +474,43 @@
 <script>
 (function () {
   'use strict';
+
+  /* ================= 机型表 ================= */
+  // 状态 / 控制 / HMS / AMS 这些各机型走的是同一套 MQTT 协议，与型号无关；
+  // 只有内置摄像头的通道不一样（见 cam 字段），所以型号主要影响显示名和摄像头。
+  //   rtsps = 322 端口 RTSPS（本项目已适配）
+  //   jpeg  = P1 / A1 / A2 系列 6000 端口 JPEG 推流（本项目尚未适配）
+  //   none  = 没有内置摄像头
+  // ok = 1 表示作者有实机验证过；其余按同系列协议推断，首次用不通请反馈。
+  var MODELS = {
+    '':     { name: '拓竹打印机', cam: 'rtsps', ok: 0, tip: '' },
+    OTHER:  { name: '拓竹打印机', cam: 'rtsps', ok: 0, tip: '未知型号，摄像头按 RTSPS 322 尝试。' },
+
+    P2S:    { name: 'P2S',  cam: 'rtsps', ok: 1, tip: '本项目就是在 P2S 上开发和实测的，一切功能可用。' },
+    P1S:    { name: 'P1S',  cam: 'jpeg',  ok: 0, tip: 'P1 系列的摄像头走 6000 端口 JPEG 推流，与 P2S 不是同一套协议，当前版本看不了画面；状态和控制正常。' },
+    P1P:    { name: 'P1P',  cam: 'none',  ok: 0, tip: 'P1P 没有内置摄像头，其他功能正常。' },
+
+    X1C:    { name: 'X1 Carbon', cam: 'rtsps', ok: 0, tip: 'X 系列与 P2S 同为 RTSPS 322，理论可用，未实机验证。' },
+    X1E:    { name: 'X1E',  cam: 'rtsps', ok: 0, tip: 'X 系列与 P2S 同为 RTSPS 322，理论可用，未实机验证。' },
+    X2D:    { name: 'X2D',  cam: 'rtsps', ok: 0, tip: 'X2 系列为双喷头新机，摄像头按 RTSPS 322 尝试，未实机验证。' },
+
+    A1:     { name: 'A1',   cam: 'jpeg',  ok: 0, tip: 'A 系列的摄像头走 6000 端口 JPEG 推流，当前版本看不了画面；状态和控制正常。' },
+    A1M:    { name: 'A1 mini', cam: 'jpeg', ok: 0, tip: 'A 系列的摄像头走 6000 端口 JPEG 推流，当前版本看不了画面；状态和控制正常。' },
+    A2L:    { name: 'A2L',  cam: 'jpeg',  ok: 0, tip: 'A 系列摄像头通道未适配，当前版本看不了画面；状态和控制正常。' },
+
+    H2D:    { name: 'H2D',  cam: 'rtsps', ok: 0, tip: 'H 系列按 RTSPS 322 尝试，未实机验证。' },
+    H2S:    { name: 'H2S',  cam: 'rtsps', ok: 0, tip: 'H 系列按 RTSPS 322 尝试，未实机验证。' },
+    H2C:    { name: 'H2C',  cam: 'rtsps', ok: 0, tip: 'H 系列按 RTSPS 322 尝试，未实机验证。' }
+  };
+
+  function modelInfo(id) {
+    var k = String(id || '').toUpperCase();
+    return MODELS[k] || MODELS.OTHER;
+  }
+  function modelName(id) {
+    var k = String(id || '').toUpperCase();
+    return MODELS[k] ? MODELS[k].name : (k || '拓竹打印机');
+  }
 
   /* ================= state ================= */
   var S = {
@@ -460,6 +537,7 @@
     light: '',
     camOn: false,
     shape: '',
+    model: '',          // 用户选择的机型 id（'' = 未指定）
     online: false,
     cfg: null,
     lastError: null,
@@ -467,6 +545,14 @@
   };
   var HIST = { n: [], b: [] };
   var HIST_MAX = 150;
+
+  // 顶栏标题：选了型号就带型号，连上了再带 IP
+  function devTitle(ip) {
+    var n = S.model ? modelName(S.model) : '拓竹打印机';
+    if (ip) return n + ' · ' + ip;
+    return S.model ? n + ' 看板' : n + '看板';
+  }
+  function setDevTitle(ip) { $('devName').textContent = devTitle(ip); }
 
   // HMS 项拼成 0500-0500-0001-0007 形式，便于识别
   function hmsId(h) {
@@ -623,7 +709,9 @@
     $('metaWifi').textContent = S.wifi != null ? S.wifi + ' dBm' : '—';
     var spd = ['', '静音', '标准', '运动', '狂暴'];
     $('metaSpeed').textContent = S.speedLvl >= 1 && S.speedLvl <= 4 ? spd[S.speedLvl] : '—';
-    $('metaModel').textContent = S.shape || 'P2S';
+    // 型号：用户选的优先，其次用打印机自己报的 machine_type
+    var mk = S.model || S.shape || '';
+    $('metaModel').textContent = mk ? modelName(mk) : '—';
 
     // 控制按钮
     var can = S.online;
@@ -855,7 +943,8 @@
       if (!/\.(gcode|3mf)$/i.test(name)) name = name;
       S.file = name;
     }
-    if (print.machine_name) { /* 机型名可来自 mqtt */ }
+    if (print.machine_type) S.shape = String(print.machine_type).toUpperCase();
+    else if (print.machine_name) S.shape = String(print.machine_name).toUpperCase();
     if (print.wifi_signal) {
       var w = parseInt(String(print.wifi_signal).replace('dBm', ''), 10);
       if (!isNaN(w)) S.wifi = w;
@@ -907,8 +996,10 @@
     timer: null,
     connect: function (cfg) {
       this.stop();
+      S.model = cfg.model || '';
       if (window.AndroidBridge && window.AndroidBridge.connect) {
         this.mode = 'native';
+        // 原生层只认 ip/code/serial 三个参数，多传会抛异常
         window.AndroidBridge.connect(cfg.ip, cfg.code, cfg.serial || '');
       } else if (location.protocol === 'http:' || location.protocol === 'https:') {
         this.mode = 'ws';
@@ -928,7 +1019,7 @@
       try { this.ws = new WebSocket(url); } catch (e) { setCfgMsg('无法建立 WebSocket'); return; }
       this.ws.onopen = function () {
         self.ws.send(JSON.stringify({
-          type: 'connect', ip: cfg.ip, code: cfg.code, serial: cfg.serial || ''
+          type: 'connect', ip: cfg.ip, code: cfg.code, serial: cfg.serial || '', model: cfg.model || ''
         }));
       };
       this.ws.onmessage = function (ev) {
@@ -1003,8 +1094,8 @@
     S.state = 'RUNNING';
     S.totalLayer = 268; S.layer = 99;
     S.nozzleT = 220; S.bedT = 60;
-    S.file = 'Benchy_P2S_0.2mm_PLA.3mf';
-    S.shape = 'P2S';
+    S.file = 'Benchy_' + (S.model || 'P2S') + '_0.2mm_PLA.3mf';
+    S.shape = S.model || '';
     S.wifi = -48;
     S.speedLvl = 2;
     S.fan = 70;
@@ -1067,12 +1158,27 @@
 
   /* ================= 交互 ================= */
   var sheet = $('cfgSheet');
+
+  // 选型号时实时说明这个机型能用到什么
+  function updateModelTip() {
+    var id = $('inModel').value;
+    var m = modelInfo(id);
+    var t = m.tip || '状态、控制、摄像头按通用配置尝试。';
+    var el = $('modelTip');
+    el.textContent = t;
+    el.style.color = m.cam === 'rtsps' ? '' : 'var(--yellow)';
+  }
+  $('inModel').onchange = updateModelTip;
+
   function openCfg() {
     var c = S.cfg || {};
+    $('inModel').value = c.model || '';
     $('inIp').value = c.ip || '';
     $('inCode').value = c.code || '';
     $('inSerial').value = c.serial || '';
-    setCfgMsg('');
+    updateModelTip();
+    setCfgMsg(c.code ? '' : (serverPreset ? '访问码可留空 · 桥接服务端已预置' : ''));
+    $('inCode').placeholder = serverPreset ? '留空 = 使用服务器预置的访问码' : '打印机屏幕上的 8 位访问码';
     sheet.classList.add('open');
     setTimeout(function () { $('inIp').focus(); }, 120);
   }
@@ -1086,23 +1192,25 @@
     Link.stop();
     Link.mode = 'demo';
     startDemo();
-    $('devName').textContent = 'P2S 看板';
-    $('devSub').textContent = '演示模式';
-    $('footMode').textContent = '演示数据';
+    setDevTitle();
+    $('devSub').textContent = '演示模式';    $('footMode').textContent = '演示数据';
   };
 
   $('btnSave').onclick = function () {
     var ip = $('inIp').value.trim();
     var code = $('inCode').value.trim();
     if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { setCfgMsg('IP 格式不对，示例 192.168.1.100'); return; }
-    if (code.length < 4) { setCfgMsg('访问码至少 8 位，请照打印机屏幕填'); return; }
-    var cfg = { ip: ip, code: code, serial: $('inSerial').value.trim() };
+    if (code.length < 4 && !serverPreset) { setCfgMsg('访问码至少 8 位，请照打印机屏幕填'); return; }
+    var cfg = { ip: ip, code: code, serial: $('inSerial').value.trim(), model: $('inModel').value };
     S.cfg = cfg;
+    S.model = cfg.model;
+    S.shape = '';
     try { localStorage.setItem('bambu_cfg', JSON.stringify(cfg)); } catch (e) {}
     if (window.AndroidBridge && window.AndroidBridge.saveConfig) {
-      try { window.AndroidBridge.saveConfig(cfg.ip, cfg.code, cfg.serial); } catch (e) {}
+      // 4 个参数：旧版 APK 只有 3 个，会抛异常，已被 catch 兜住（localStorage 还有一份）
+      try { window.AndroidBridge.saveConfig(cfg.ip, cfg.code, cfg.serial, cfg.model || ''); } catch (e) {}
     }
-    $('devName').textContent = 'P2S · ' + ip;
+    setDevTitle(ip);
     $('devSub').textContent = '连接中…';
     closeCfg();
     Link.connect(cfg);
@@ -1166,6 +1274,14 @@
     $('camMeta').textContent = camNative ? '点击全屏' : (S.camOn ? '点击关闭' : '点击开启');
   }
   function camStart() {
+    // 机型决定摄像头通道：P1 / A1 / A2 系列是另一套协议，P1P 干脆没摄像头
+    var mi = modelInfo(S.model);
+    if (mi.cam === 'none') { showToast('该机型没有内置摄像头', 'no'); return; }
+    if (mi.cam === 'jpeg') {
+      S.lastError = mi.tip;
+      showToast('该系列摄像头通道暂未适配', 'no');
+      return;
+    }
     if (camNative) {
       if (!S.cfg || !S.cfg.ip) { showToast('请先连接打印机', 'no'); return; }
       window.AndroidBridge.camStart(S.cfg.ip, S.cfg.code);
@@ -1195,6 +1311,17 @@
   $('camMeta').onclick = function () { S.camOn ? camStop() : camStart(); };
 
   /* ================= 启动 ================= */
+  // 服务端（桥接）是否已预置访问码：预置了的话，设置面板里访问码可以留空
+  var serverPreset = false;
+
+  function autoFallbackDemo() {
+    Link.mode = 'demo';
+    startDemo();
+    $('devSub').textContent = '演示模式';
+    $('footMode').textContent = '演示数据';
+    setTimeout(openCfg, 400);
+  }
+
   try {
     var dz = JSON.parse(localStorage.getItem('bam_dismissed') || '{}');
     if (dz && typeof dz === 'object') S.dismissed = dz;
@@ -1221,28 +1348,44 @@
   }
 
   if (qs.get('ip') && qs.get('code')) {
-    // 直连链接：?ip=192.168.1.100&code=xxxxxxxx
-    saved = { ip: qs.get('ip'), code: qs.get('code'), serial: qs.get('serial') || '' };
+    // 直连链接：?ip=192.168.1.100&code=xxxxxxxx&model=P2S
+    saved = { ip: qs.get('ip'), code: qs.get('code'), serial: qs.get('serial') || '',
+              model: (qs.get('model') || '').toUpperCase() };
     S.cfg = saved;
-    $('devName').textContent = 'P2S · ' + saved.ip;
+    S.model = saved.model;
+    $('devName').textContent = devTitle(saved.ip);
     $('devSub').textContent = '连接中…';
     Link.connect(saved);
   } else if (qs.get('demo') === '1') {
+    S.model = (qs.get('model') || '').toUpperCase();
     Link.mode = 'demo';
     startDemo();
+    setDevTitle();
     $('devSub').textContent = '演示模式';
     $('footMode').textContent = '演示数据';
   } else if (saved && saved.ip) {
     S.cfg = saved;
-    $('devName').textContent = 'P2S · ' + saved.ip;
+    S.model = saved.model || '';
+    $('devName').textContent = devTitle(saved.ip);
     $('devSub').textContent = '连接中…';
     Link.connect(saved);
+  } else if (location.protocol === 'http:' || location.protocol === 'https:') {
+    // 浏览器访问桥接服务：先问服务端有没有预置打印机凭据
+    // （部署在 NAS 上时，访问码放在服务端，页面打开即连，无需手动填写）
+    fetch('/api/config').then(function (r) { return r.json(); }).then(function (c) {
+      serverPreset = !!(c && c.autoConnect);
+      if (c && c.autoConnect && c.ip) {
+        S.cfg = { ip: c.ip, code: '', serial: c.serial || '', model: c.model || '' };
+        S.model = S.cfg.model;
+        $('devName').textContent = devTitle(c.ip);
+        $('devSub').textContent = '连接中…';
+        Link.connect(S.cfg);
+      } else {
+        autoFallbackDemo();
+      }
+    }).catch(function () { autoFallbackDemo(); });
   } else {
-    Link.mode = 'demo';
-    startDemo();
-    $('devSub').textContent = '演示模式';
-    $('footMode').textContent = '演示数据';
-    setTimeout(openCfg, 400);
+    autoFallbackDemo();
   }
   render();
   setTimeout(drawChart, 60);

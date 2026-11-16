@@ -103,11 +103,12 @@ public class MainActivity extends Activity implements BambuClient.Sink {
         }
 
         @JavascriptInterface
-        public void saveConfig(String ip, String code, String serial) {
+        public void saveConfig(String ip, String code, String serial, String model) {
             sp.edit()
                     .putString("ip", ip)
                     .putString("code", code)
                     .putString("serial", serial)
+                    .putString("model", model == null ? "" : model)
                     .apply();
         }
 
@@ -120,6 +121,7 @@ public class MainActivity extends Activity implements BambuClient.Sink {
                 o.put("ip", ip);
                 o.put("code", sp.getString("code", ""));
                 o.put("serial", sp.getString("serial", ""));
+                o.put("model", sp.getString("model", ""));
                 return o.toString();
             } catch (Exception e) {
                 return "";
