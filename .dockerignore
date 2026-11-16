@@ -1,0 +1,30 @@
+# 构建镜像时不需要的东西
+
+# 依赖在容器里重新装，宿主机这份可能是 Windows 平台的
+**/node_modules
+
+# 打印机凭据（运行时由 compose 注入，不打进镜像）
+.env
+.env.*
+!.env.example
+
+# APK 产物与签名密钥（绝对不要进镜像）
+apk/build
+apk/*.apk
+apk/*.apk.idsig
+apk/release.jks
+apk/icon-preview.png
+apk/res
+docs
+
+# 其他
+.git
+.gitignore
+.preview
+*.log
+DEPLOY-NAS.md
+README.md
+LICENSE
+start.bat
+docker-compose.yml
+Dockerfile

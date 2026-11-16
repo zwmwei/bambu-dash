@@ -1,0 +1,27 @@
+# 打印机凭据（真实值只存在本地）
+.env
+
+# Node 依赖
+node_modules/
+
+# 调试截图（README 用到的已挑进 docs/）
+.preview/
+*.log
+
+# APK 构建中间产物
+apk/build/
+
+# APK 的签名密钥与分离签名文件
+# build.sh 在找不到 release.jks 时会自动生成一个新的，所以不放仓库也能构建
+apk/release.jks
+*.jks
+*.keystore
+apk/*.apk.idsig
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地打包的部署包（内容与仓库重复）
+*.zip

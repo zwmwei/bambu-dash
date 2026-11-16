@@ -1,0 +1,39 @@
+services:
+  bambu-dash:
+    build:
+      context: .
+      args:
+        # 基础镜像走 DaoCloud 镜像站，绕过 docker.io 直连
+        # （飞牛内置的 docker.fnnas.com 加速源会返回 401，用不了）
+        BASE_IMAGE: docker.m.daocloud.io/library/node:20-slim
+        # apt 走阿里云源；海外环境删掉这行
+        APT_MIRROR: mirrors.aliyun.com
+    image: bambu-dash:latest
+    container_name: bambu-dash
+    restart: unless-stopped
+
+    # 用 host 网络，主要为了「自动发现打印机」：
+    #   SSDP 靠 UDP 广播 239.255.255.250:2021 找设备，
+    #   Docker 默认的 bridge 网络收不到局域网广播应答，发现按钮会一直转圈。
+    # 状态 / 控制 / 摄像头都只是容器往外连打印机，两种网络都通。
+    # host 模式下不需要写 ports，容器直接占用宿主机 8848。
+    network_mode: host
+
+    environment:
+      TZ: Asia/Shanghai
+      PORT: "8848"
+
+      # ---- 打印机凭据 ----
+      # 值从同目录的 .env 读（照 .env.example 复制一份改名 .env 再填）。
+      # .env 已被 .gitignore 排除，不会进仓库；访问码只留在服务端，
+      # 不会下发到浏览器。
+      PRINTER_IP: ${PRINTER_IP:?请先在 .env 里填打印机 IP}
+      PRINTER_CODE: ${PRINTER_CODE:?请先在 .env 里填 8 位访问码}
+      PRINTER_SERIAL: ${PRINTER_SERIAL:-}
+
+    # 想看容器内日志时间对得上，也方便排障
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

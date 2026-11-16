@@ -1,0 +1,23 @@
+# 统一换行符：Windows 上编辑、Linux 上运行的项目必须处理，否则
+# build.sh 在 Linux 里会报 "bad interpreter: /bin/bash^M"
+* text=auto
+
+*.sh   text eol=lf
+*.js   text eol=lf
+*.java text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+Dockerfile  text eol=lf
+.dockerignore text eol=lf
+.gitignore text eol=lf
+.env.example text eol=lf
+
+*.bat  text eol=crlf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.apk binary
+*.jks binary
+*.idsig binary

@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0a0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>P2S 看板</title>
+<style>
+  :root{
+    --bg:#0a0d10;
+    --panel:#131920;
+    --panel2:#1a222b;
+    --line:#232c36;
+    --txt:#e9eff6;
+    --dim:#7b8b9b;
+    --dim2:#4e5c6b;
+    --green:#00c16a;
+    --green-dim:#00ae42;
+    --orange:#ff7a45;
+    --blue:#3fa9ff;
+    --yellow:#ffb020;
+    --red:#ff4d5e;
+    --purple:#b47bff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:15px;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    background-image:radial-gradient(900px 500px at 50% -10%,rgba(0,193,106,.09),transparent 70%);
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  #app{max-width:520px;margin:0 auto;padding:0 14px calc(24px + env(safe-area-inset-bottom));}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:calc(14px + env(safe-area-inset-top)) 2px 12px;gap:10px;
+  }
+  .brand{display:flex;align-items:center;gap:9px;min-width:0}
+  .dot{
+    width:9px;height:9px;border-radius:50%;background:var(--dim2);flex:none;
+    box-shadow:0 0 0 4px rgba(255,255,255,.03);
+    transition:background .3s,box-shadow .3s;
+  }
+  .dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(0,193,106,.14),0 0 12px rgba(0,193,106,.7)}
+  .dot.err{background:var(--red);box-shadow:0 0 0 4px rgba(255,77,94,.14)}
+  .brand .name{font-size:16px;font-weight:650;letter-spacing:.3px}
+  .brand .sub{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tools{display:flex;align-items:center;gap:8px;flex:none}
+  .badge{
+    font-size:12px;font-weight:600;letter-spacing:.4px;
+    padding:5px 11px;border-radius:999px;
+    background:rgba(123,139,155,.13);color:var(--dim);
+    border:1px solid transparent;white-space:nowrap;
+    transition:.3s;
+  }
+  .icon{
+    width:34px;height:34px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel);color:var(--dim);font-size:15px;line-height:1;
+    display:grid;place-items:center;cursor:pointer;flex:none;
+  }
+  .icon:active{background:var(--panel2)}
+
+  /* ---------- cards ---------- */
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:15px;
+  }
+  .card-h{
+    font-size:11px;letter-spacing:1.2px;color:var(--dim2);
+    text-transform:uppercase;font-weight:700;margin-bottom:11px;
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    display:flex;align-items:center;gap:16px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:22px;padding:16px;
+    position:relative;overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(240px 160px at 18% 50%,rgba(0,193,106,.10),transparent 70%);
+    opacity:0;transition:opacity .6s;
+  }
+  .hero.live::after{opacity:1}
+  .ringWrap{position:relative;width:150px;height:150px;flex:none}
+  .ring{width:150px;height:150px;transform:rotate(-90deg);display:block}
+  .ringBg{fill:none;stroke:#1e262f;stroke-width:9}
+  .ringFg{
+    fill:none;stroke:url(#gr);stroke-width:9;stroke-linecap:round;
+    stroke-dasharray:326.7;stroke-dashoffset:326.7;
+    transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .4s;
+  }
+  .ringTxt{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:2px;
+  }
+  .pct{font-size:36px;font-weight:700;letter-spacing:-1.5px;line-height:1}
+  .pct span{font-size:15px;font-weight:600;color:var(--dim);margin-left:1px;letter-spacing:0}
+  .pctLbl{font-size:11px;color:var(--dim2);letter-spacing:.8px;font-weight:600}
+
+  .heroInfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+  .file{
+    font-size:13px;font-weight:600;line-height:1.35;color:var(--txt);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    overflow-wrap:break-word;word-break:normal;
+  }
+  .kv{display:flex;align-items:baseline;gap:7px}
+  .kv .k{font-size:11px;color:var(--dim2);font-weight:600;letter-spacing:.5px;min-width:32px}
+  .kv .v{font-size:14px;font-weight:600;color:#c3d0dd}
+  .eta{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--green);font-weight:600}
+  .eta.off{color:var(--dim2)}
+  .sep{height:1px;background:var(--line);margin:1px 0}
+
+  /* ---------- temps ---------- */
+  .temps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  .temps.two{grid-template-columns:repeat(2,1fr)}
+  .tcard{
+    background:var(--panel);border:1px solid var(--line);
+    border-radius:16px;padding:12px 11px 11px;position:relative;overflow:hidden;
+  }
+  .tcard .lbl{font-size:11px;color:var(--dim);font-weight:600;letter-spacing:.4px;display:flex;align-items:center;gap:5px}
+  .tcard .lbl i{width:6px;height:6px;border-radius:50%;display:block}
+  .tcard .big{font-size:23px;font-weight:700;letter-spacing:-.8px;margin-top:7px;line-height:1;white-space:nowrap}
+  .tcard .big em{font-size:12px;font-style:normal;color:var(--dim);font-weight:600;margin-left:1px;letter-spacing:0}
+  .tcard .tgt{font-size:11px;color:var(--dim2);margin-top:5px;font-weight:600}
+  .bar{height:3px;border-radius:2px;background:#1e262f;margin-top:9px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:2px;transition:width .6s ease}
+
+  /* ---------- ams ---------- */
+  .ams-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .spool{
+    background:var(--panel2);border:1px solid transparent;border-radius:13px;
+    padding:9px 8px 8px;text-align:center;position:relative;
+    transition:.3s;min-width:0;
+  }
+  .spool.act{border-color:rgba(0,193,106,.55);background:rgba(0,193,106,.07)}
+  .spool.act::after{
+    content:"";position:absolute;top:7px;right:7px;width:5px;height:5px;
+    border-radius:50%;background:var(--green);box-shadow:0 0 7px var(--green);
+  }
+  .spool.empty{opacity:.36}
+  .spool .sdot{
+    width:24px;height:24px;border-radius:50%;margin:0 auto 7px;
+    border:1.5px solid rgba(255,255,255,.16);
+    box-shadow:inset 0 0 7px rgba(0,0,0,.45);
+  }
+  .spool .stype{font-size:11px;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .spool .srem{font-size:10px;color:var(--dim);margin-top:2px;font-weight:600}
+  .spool .sbar{height:2px;border-radius:2px;background:#0e1318;margin-top:6px;overflow:hidden}
+  .spool .sbar i{display:block;height:100%;background:var(--dim2);border-radius:2px}
+
+  /* ---------- chart ---------- */
+  .chartbox{margin-top:10px;padding:14px 14px 10px}
+  .chart-legend{display:flex;gap:14px;align-items:center;margin-bottom:8px}
+  .chart-legend span{font-size:11px;font-weight:600;color:var(--dim);display:flex;align-items:center;gap:5px}
+  .chart-legend i{width:12px;height:2.5px;border-radius:2px;display:block}
+  #chart{width:100%;height:104px;display:block}
+
+  /* ---------- meta ---------- */
+  .meta{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
+  .mi{display:flex;align-items:center;gap:8px;min-width:0}
+  .mi .ic{
+    width:30px;height:30px;border-radius:9px;background:var(--panel2);
+    display:grid;place-items:center;flex:none;color:var(--dim);
+  }
+  .mi .ic svg{width:15px;height:15px;display:block}
+  .mi .txt{min-width:0}
+  .mi .mk{font-size:10px;color:var(--dim2);font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+  .mi .mv{font-size:13px;font-weight:650;color:#c9d6e2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ---------- alerts ---------- */
+  .alert{
+    margin-top:10px;border-radius:14px;padding:11px 13px;font-size:12.5px;
+    line-height:1.45;display:none;align-items:flex-start;gap:9px;font-weight:500;
+  }
+  .alert.show{display:flex}
+  .alert.warn{background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:#ffcc70}
+  .alert.err{background:rgba(255,77,94,.1);border:1px solid rgba(255,77,94,.32);color:#ff9aa4}
+  .alert.info{background:rgba(63,169,255,.09);border:1px solid rgba(63,169,255,.26);color:#8fc2f0}
+
+  /* ---------- 摄像头 ---------- */
+  .camframe{
+    position:relative;margin-top:9px;border-radius:14px;overflow:hidden;
+    background:#05070a;aspect-ratio:16/9;border:1px solid var(--line);
+  }
+  .camframe img{width:100%;height:100%;object-fit:cover;display:block}
+  .camph{
+    position:absolute;inset:0;display:flex;flex-direction:column;gap:6px;
+    align-items:center;justify-content:center;color:var(--dim);font-size:12.5px;
+    background:radial-gradient(circle at 50% 45%,#11161d,#05070a 70%);
+    cursor:pointer;
+  }
+  .camph b{font-size:13px;color:#9fb0c2;font-weight:600}
+  .camph span{font-size:11px;color:var(--dim2)}
+  #camBadge{
+    position:absolute;left:9px;top:9px;font-size:10.5px;font-weight:700;
+    padding:3px 7px;border-radius:6px;background:rgba(0,0,0,.55);
+    color:#7ee0a8;letter-spacing:.5px;display:none;
+  }
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(14px);
+    background:rgba(18,23,30,.96);border:1px solid var(--line);color:var(--txt);
+    font-size:12.5px;padding:9px 16px;border-radius:12px;opacity:0;
+    transition:opacity .2s,transform .2s;pointer-events:none;z-index:99;
+    max-width:82vw;text-align:center;line-height:1.4;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.ok{border-color:rgba(0,193,106,.45);color:#6ee7a8}
+  #toast.no{border-color:rgba(255,77,94,.45);color:#ff9aa4}
+  .alert .atxt{flex:1;min-width:0}
+  .alert .ax{
+    flex:none;cursor:pointer;font-size:16px;line-height:1;opacity:.6;
+    padding:0 2px;font-weight:600;user-select:none;
+  }
+  .alert .ax:hover{opacity:1}
+
+  /* ---------- control ---------- */
+  .ctrl{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px}
+  .ctrlnote{
+    margin:9px 0 0;font-size:11.5px;line-height:1.55;color:var(--dim);
+    text-align:center;min-height:0;
+  }
+  .ctrlnote b{color:#c3d0dd;font-weight:650}
+  .ctrlnote b.ok{color:#00c16a}
+  .btn{
+    border:1px solid var(--line);background:var(--panel);color:#c3d0dd;
+    border-radius:13px;padding:12px 8px;font-size:13.5px;font-weight:650;
+    cursor:pointer;font-family:inherit;transition:.15s;
+  }
+  .btn:active{background:var(--panel2);transform:scale(.985)}
+  .btn:disabled{opacity:.35}
+  .btn.lit{background:rgba(255,196,64,.15);border-color:rgba(255,196,64,.42);color:#ffd479}
+  .btn.pri{background:rgba(0,193,106,.13);border-color:rgba(0,193,106,.4);color:#4fdda0}
+  .btn.dan{background:rgba(255,77,94,.1);border-color:rgba(255,77,94,.3);color:#ff8a95}
+
+  /* ---------- config sheet ---------- */
+  .sheet{
+    position:fixed;inset:0;z-index:50;display:none;
+    background:rgba(4,6,8,.72);backdrop-filter:blur(6px);
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .sheet.open{display:flex}
+  .sheet-in{
+    width:100%;max-width:400px;background:var(--panel);
+    border:1px solid var(--line);border-radius:22px;padding:22px;
+    animation:pop .26s cubic-bezier(.2,.9,.3,1.1);
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+  .sheet-in h2{margin:0 0 4px;font-size:18px;font-weight:700}
+  .sheet-in .hint{font-size:12px;color:var(--dim);line-height:1.6;margin:0 0 18px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:11px;color:var(--dim);font-weight:700;letter-spacing:.6px;margin-bottom:6px;text-transform:uppercase}
+  .field input{
+    width:100%;background:#0d1218;border:1px solid var(--line);border-radius:11px;
+    padding:11px 12px;color:var(--txt);font-size:15px;font-family:inherit;
+    outline:none;transition:border-color .2s;letter-spacing:.5px;
+  }
+  .field input:focus{border-color:rgba(0,193,106,.55)}
+  .field input::placeholder{color:var(--dim2)}
+  .sheet-in .row{display:flex;gap:9px;margin-top:18px}
+  .sheet-in .row .btn{flex:1;padding:13px}
+  .sheet-msg{font-size:12px;color:var(--red);margin-top:10px;min-height:16px;font-weight:600}
+  .ghost{background:transparent;border:none;color:var(--dim);font-size:12px;padding:8px 0 0;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px}
+
+  .foot{text-align:center;font-size:11px;color:var(--dim2);margin-top:16px;line-height:1.6}
+  .foot b{color:var(--dim);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" id="linkDot"></span>
+      <div style="min-width:0">
+        <div class="name" id="devName">P2S 看板</div>
+        <div class="sub" id="devSub">未连接</div>
+      </div>
+    </div>
+    <div class="tools">
+      <span class="badge" id="stateBadge">— —</span>
+      <button class="icon" id="btnCfg" aria-label="设置">⚙</button>
+    </div>
+  </header>
+
+  <section class="hero" id="hero">
+    <div class="ringWrap">
+      <svg class="ring" viewBox="0 0 120 120">
+        <defs>
+          <linearGradient id="gr" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#00e07a"/>
+            <stop offset="100%" stop-color="#00a3ff"/>
+          </linearGradient>
+        </defs>
+        <circle class="ringBg" cx="60" cy="60" r="52"/>
+        <circle class="ringFg" id="ringFg" cx="60" cy="60" r="52"/>
+      </svg>
+      <div class="ringTxt">
+        <div class="pct num" id="pct">0<span>%</span></div>
+        <div class="pctLbl" id="pctLbl">进度</div>
+      </div>
+    </div>
+    <div class="heroInfo">
+      <div class="file" id="fileTxt">暂无打印任务</div>
+      <div class="sep"></div>
+      <div class="kv"><span class="k">层</span><span class="v num" id="layerTxt">— / —</span></div>
+      <div class="eta off" id="etaBox"><span>⏱</span><span id="etaTxt">—</span></div>
+    </div>
+  </section>
+
+  <section class="temps" id="temps">
+    <div class="tcard">
+      <div class="lbl"><i style="background:var(--orange)"></i>喷头</div>
+      <div class="big num" id="nozzleV">—<em>°</em></div>
+      <div class="tgt num" id="nozzleT">目标 —</div>
+      <div class="bar"><i id="nozzleBar" style="background:linear-gradient(90deg,#ff5e2b,#ffb020);width:0"></i></div>
+    </div>
+    <div class="tcard">
+      <div class="lbl"><i style="background:var(--blue)"></i>热床</div>
+      <div class="big num" id="bedV">—<em>°</em></div>
+      <div class="tgt num" id="bedT">目标 —</div>
+      <div class="bar"><i id="bedBar" style="background:linear-gradient(90deg,#2f7ef0,#4fd8ff);width:0"></i></div>
+    </div>
+    <div class="tcard" id="chamberCard">
+      <div class="lbl"><i style="background:var(--purple)"></i>腔体</div>
+      <div class="big num" id="chamberV">—<em>°</em></div>
+      <div class="tgt num" id="chamberT">环境</div>
+      <div class="bar"><i id="chamberBar" style="background:linear-gradient(90deg,#8a5cf6,#c98bff);width:0"></i></div>
+    </div>
+  </section>
+
+  <div class="alert" id="alertBox"></div>
+
+  <section class="card" id="camCard">
+    <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+      <span>摄像头</span>
+      <span id="camMeta" style="font-size:11px;color:var(--dim2);letter-spacing:0;text-transform:none;cursor:pointer">点击开启</span>
+    </div>
+    <div class="camframe">
+      <img id="camImg" alt="" style="display:none">
+      <div class="camph" id="camPh">
+        <b>实时画面</b>
+        <span>点击开启 · 局域网直连</span>
+      </div>
+      <div id="camBadge">LIVE</div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:10px">
+    <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+      <span>AMS 料盘</span>
+      <span id="amsMeta" style="font-size:11px;color:var(--dim2);letter-spacing:0;text-transform:none">—</span>
+    </div>
+    <div class="ams-grid" id="amsGrid"></div>
+  </section>
+
+  <section class="card chartbox">
+    <div class="chart-legend">
+      <span><i style="background:var(--orange)"></i>喷头</span>
+      <span><i style="background:var(--blue)"></i>热床</span>
+      <span style="margin-left:auto;color:var(--dim2)">近 5 分钟</span>
+    </div>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <section class="meta">
+    <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.2c1.6 1.5 1.6 3.6 0 5.1M12 20.8c-1.6-1.5-1.6-3.6 0-5.1M3.2 12c1.5-1.6 3.6-1.6 5.1 0M20.8 12c-1.5 1.6-3.6 1.6-5.1 0"/></svg></div><div class="txt"><div class="mk">风扇</div><div class="mv num" id="metaFan">—</div></div></div>
+    <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19v-3M9.3 19v-6M14.7 19V9.5M20 19V5"/></svg></div><div class="txt"><div class="mk">信号</div><div class="mv num" id="metaWifi">—</div></div></div>
+    <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13.5 3 5 13.8h5.2L9.8 21l8.6-10.9h-5.2z"/></svg></div><div class="txt"><div class="mk">速度</div><div class="mv" id="metaSpeed">—</div></div></div>
+    <div class="mi"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 4.5v5"/></svg></div><div class="txt"><div class="mk">机型</div><div class="mv" id="metaModel">P2S</div></div></div>
+  </section>
+
+  <div class="ctrl" id="ctrlBox">
+    <button class="btn pri" id="btnPause" disabled>暂停</button>
+    <button class="btn" id="btnResume" disabled>继续</button>
+    <button class="btn dan" id="btnStop" disabled>停止</button>
+    <button class="btn" id="btnLight" disabled>灯 —</button>
+  </div>
+
+  <p class="ctrlnote" id="ctrlNote"></p>
+
+  <div id="toast"></div>
+
+  <div class="foot">
+    <b id="footMode">—</b><br>
+    <span id="footHint">局域网直连 · 数据不上云</span>
+  </div>
+</div>
+
+<!-- 配置面板 -->
+<div class="sheet" id="cfgSheet">
+  <div class="sheet-in">
+    <h2>连接打印机</h2>
+    <p class="hint">
+      打印机屏幕 → 设置 → <b>局域网模式(LAN Only)</b>，打开后即可看到 <b>访问码</b>；
+      同一页面还能看到 IP 地址。
+    </p>
+    <div class="field">
+      <label>打印机 IP</label>
+      <input id="inIp" placeholder="192.168.1.100" inputmode="decimal" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>访问码 Access Code</label>
+      <input id="inCode" placeholder="8 位访问码" maxlength="12" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>序列号（可选）</label>
+      <input id="inSerial" placeholder="留空自动识别" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="sheet-msg" id="cfgMsg"></div>
+    <div class="row">
+      <button class="btn" id="btnCancel">取消</button>
+      <button class="btn pri" id="btnSave">连接</button>
+    </div>
+    <div style="text-align:center"><button class="ghost" id="btnDemo">用演示数据看看</button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= state ================= */
+  var S = {
+    state: 'IDLE',
+    pct: 0,
+    remain: 0,
+    layer: 0,
+    totalLayer: 0,
+    nozzle: 0, nozzleT: 0,
+    bed: 0, bedT: 0,
+    chamber: 0,
+    file: '',
+    fan: 0,
+    wifi: null,
+    speedLvl: 0,
+    ams: [],
+    trayNow: '255',
+    amsHum: null,
+    amsTemp: null,
+    err: 0,
+    hms: [],
+    dismissed: {},
+    auth: true,
+    light: '',
+    camOn: false,
+    shape: '',
+    online: false,
+    cfg: null,
+    lastError: null,
+    lastMsg: 0
+  };
+  var HIST = { n: [], b: [] };
+  var HIST_MAX = 150;
+
+  // HMS 项拼成 0500-0500-0001-0007 形式，便于识别
+  function hmsId(h) {
+    function hx(n, w) {
+      var s = ((n || 0) >>> 0).toString(16).toUpperCase();
+      while (s.length < w) s = '0' + s;
+      return s;
+    }
+    var a = hx(h.attr, 8), c = hx(h.code, 8);
+    return a.slice(0, 4) + '-' + a.slice(4) + '-' + c.slice(0, 4) + '-' + c.slice(4);
+  }
+
+  // HMS 等级：code 高 16 位，0001 错误 / 0002 警告 / 0003 提醒（仅提示，不影响打印）
+  function hmsLevel(h) { return ((h.code || 0) >>> 16) & 0xFFFF; }
+
+  // 命令回执里显示的中文名
+  var CMD_NAME = {
+    pause: '暂停', resume: '继续', stop: '停止', ledctrl: '灯光',
+    project_file: '开始打印', gcode_line: 'G-code',
+    set_nozzle_temp: '喷头温度', set_bed_temp: '热床温度'
+  };
+
+  // 已知的「提示类」HMS：不是硬件故障，不用去修
+  var HMS_HINT = {
+    '0500-0500-0001-0007': {
+      kind: 'warn',
+      text: '控制命令被打印机拒收（MQTT 命令校验失败）。原因是「开发者模式」没开——' +
+            '开一下才能用暂停/继续/停止。这不影响正常打印。'
+    }
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ================= 状态映射 ================= */
+  var STATE_MAP = {
+    IDLE:    { t: '待机',   c: '#7b8b9b' },
+    PREPARE: { t: '准备中', c: '#ffb020' },
+    RUNNING: { t: '打印中', c: '#00c16a' },
+    PAUSE:   { t: '已暂停', c: '#ffb020' },
+    FINISH:  { t: '已完成', c: '#3fa9ff' },
+    FAILED:  { t: '失败',   c: '#ff4d5e' },
+    SLICING: { t: '切片中', c: '#b47bff' },
+    INIT:    { t: '初始化', c: '#7b8b9b' },
+    OFFLINE: { t: '离线',   c: '#ff4d5e' }
+  };
+
+  /* ================= 渲染 ================= */
+  // 告警条：dismissKey 非空时带一个可关掉的 ×（关掉后记进 localStorage）
+  function showAlert(kind, text, dismissKey) {
+    var ab = $('alertBox');
+    ab.className = 'alert ' + kind + ' show';
+    ab.innerHTML = '';
+    var sp = document.createElement('span');
+    sp.className = 'atxt';
+    sp.textContent = text;
+    ab.appendChild(sp);
+    if (dismissKey) {
+      var x = document.createElement('b');
+      x.className = 'ax';
+      x.textContent = '\u00d7';
+      x.onclick = function () {
+        S.dismissed[dismissKey] = 1;
+        try { localStorage.setItem('bam_dismissed', JSON.stringify(S.dismissed)); } catch (e) {}
+        render();
+      };
+      ab.appendChild(x);
+    }
+  }
+
+  function render() {
+    var st = STATE_MAP[S.state] || STATE_MAP.IDLE;
+    var badge = $('stateBadge');
+    badge.textContent = st.t;
+    badge.style.color = st.c;
+    badge.style.background = hexA(st.c, .12);
+    badge.style.borderColor = hexA(st.c, .28);
+
+    // 进度环
+    var C = 326.7;
+    var running = S.state === 'RUNNING' || S.state === 'PAUSE' || S.state === 'PREPARE';
+    var p = running || S.pct > 0 ? Math.max(0, Math.min(100, S.pct)) : 0;
+    if (S.state === 'FINISH') p = 100;
+    $('ringFg').style.strokeDashoffset = String(C * (1 - p / 100));
+    $('ringFg').style.stroke = S.state === 'PAUSE' ? '#ffb020'
+      : S.state === 'FAILED' ? '#ff4d5e'
+      : S.state === 'FINISH' ? '#3fa9ff' : 'url(#gr)';
+    $('pct').innerHTML = Math.round(p) + '<span>%</span>';
+    $('pctLbl').textContent = S.state === 'IDLE' || !S.online ? '待机' : '进度';
+
+    // 文件 / 层
+    var fname = S.file || (S.online ? '暂无打印任务' : '等待连接');
+    $('fileTxt').innerHTML = esc(fname).replace(/([_\-\.])/g, '$1<wbr>');
+    $('layerTxt').textContent = S.totalLayer > 0 ? (S.layer + ' / ' + S.totalLayer) : '— / —';
+
+    // 剩余时间
+    var etaBox = $('etaBox');
+    if (S.state === 'RUNNING' && S.remain > 0) {
+      etaBox.className = 'eta';
+      $('etaTxt').textContent = fmtRemain(S.remain) + ' · 约 ' + fmtClock(S.remain);
+    } else if (S.state === 'PAUSE' && S.remain > 0) {
+      etaBox.className = 'eta off';
+      $('etaTxt').textContent = '暂停中 · 剩 ' + fmtRemain(S.remain);
+    } else if (S.state === 'FINISH') {
+      etaBox.className = 'eta off';
+      $('etaTxt').textContent = '打印完成';
+    } else {
+      etaBox.className = 'eta off';
+      $('etaTxt').textContent = '—';
+    }
+
+    // 温度
+    setTemp('nozzle', S.nozzle, S.nozzleT, 300);
+    setTemp('bed', S.bed, S.bedT, 120);
+    var hasCh = S.chamber > 0;
+    $('chamberCard').style.display = hasCh ? '' : 'none';
+    $('temps').className = 'temps' + (hasCh ? '' : ' two');
+    if (hasCh) {
+      $('chamberV').innerHTML = Math.round(S.chamber) + '<em>°</em>';
+      $('chamberT').textContent = '腔体';
+      $('chamberBar').style.width = Math.min(100, S.chamber / 60 * 100) + '%';
+    }
+
+    // 警报
+    var ab = $('alertBox');
+    var hmsAll = (S.hms || []).filter(function (h) { return !S.dismissed[hmsId(h)]; });
+    var hmsHint = hmsAll.filter(function (h) { return HMS_HINT[hmsId(h)]; });
+    var hmsRest = hmsAll.filter(function (h) { return !HMS_HINT[hmsId(h)]; });
+    var serious = hmsRest.filter(function (h) { return hmsLevel(h) <= 2; });
+    var info = hmsRest.filter(function (h) { return hmsLevel(h) >= 3; });
+
+    if (S.err > 0) {
+      showAlert('err', '⚠ 打印机报错：print_error = ' + S.err + '，请在打印机屏幕上查看详情。');
+    } else if (hmsHint.length) {
+      var hk = hmsId(hmsHint[0]);
+      showAlert(HMS_HINT[hk].kind, '⚠ ' + HMS_HINT[hk].text, hk);
+    } else if (serious.length) {
+      showAlert('warn', '⚠ 设备告警 ' + serious.length + ' 条（HMS ' +
+        serious.slice(0, 3).map(hmsId).join('、') + '），在打印机屏幕上查看详情');
+    } else if (info.length) {
+      showAlert('info', '提示（HMS ' + info.slice(0, 2).map(hmsId).join('、') +
+        '）：提醒级别，不影响打印。');
+    } else if (!S.online && S.cfg) {
+      showAlert('warn', '⚠ ' + (S.lastError || '与打印机失联，正在重连…'));
+    } else {
+      ab.className = 'alert';
+      ab.innerHTML = '';
+    }
+
+    // AMS
+    renderAMS();
+
+    // meta
+    $('metaFan').textContent = S.fan > 0 ? S.fan + '%' : '—';
+    $('metaWifi').textContent = S.wifi != null ? S.wifi + ' dBm' : '—';
+    var spd = ['', '静音', '标准', '运动', '狂暴'];
+    $('metaSpeed').textContent = S.speedLvl >= 1 && S.speedLvl <= 4 ? spd[S.speedLvl] : '—';
+    $('metaModel').textContent = S.shape || 'P2S';
+
+    // 控制按钮
+    var can = S.online;
+    var isRun = S.state === 'RUNNING';
+    var isPause = S.state === 'PAUSE';
+    var isBusy = isRun || isPause;
+    $('btnPause').disabled = !(can && isRun);
+    $('btnResume').disabled = !(can && isPause);
+    $('btnStop').disabled = !(can && isBusy);
+
+    // 说明为什么按钮点不动——不然一片灰看着像功能没做
+    var stName = (STATE_MAP[S.state] || {}).t || S.state || '';
+    var note = '';
+    var whyPause = '', whyResume = '', whyStop = '';
+    if (!can) {
+      note = '未连接打印机，控制不可用';
+      whyPause = whyResume = whyStop = '未连接打印机';
+    } else if (isRun) {
+      note = '打印中 · 可<b class="ok">暂停</b>或<b>停止</b>';
+    } else if (isPause) {
+      note = '已暂停 · 可<b class="ok">继续</b>或<b>停止</b>';
+    } else if (S.state === 'PREPARE') {
+      note = '准备中（预热 / 调平）· 等真正开始挤出后可暂停';
+      whyPause = whyResume = whyStop = '准备阶段不可控制';
+    } else {
+      note = stName + ' · 没有正在执行的任务，所以暂无可控制的操作';
+      whyPause = '当前' + stName + '，没有可暂停的任务';
+      whyResume = '当前' + stName + '，没有已暂停的任务';
+      whyStop = '当前' + stName + '，没有可停止的任务';
+    }
+    var cn = $('ctrlNote');
+    if (cn.innerHTML !== note) cn.innerHTML = note;
+    $('btnPause').title = whyPause;
+    $('btnResume').title = whyResume;
+    $('btnStop').title = whyStop;
+
+    // 舱内灯
+    var lb = $('btnLight');
+    lb.disabled = !can;
+    lb.textContent = S.light === 'on' ? '灯 开' : (S.light === 'off' ? '灯 关' : '灯 —');
+    lb.className = 'btn' + (S.light === 'on' ? ' lit' : '');
+
+    // 连接指示
+    var dot = $('linkDot');
+    dot.className = 'dot' + (S.online ? ' on' : (S.cfg ? ' err' : ''));
+    $('hero').className = 'hero' + (S.state === 'RUNNING' ? ' live' : '');
+    if (Link.mode === 'demo') $('devSub').textContent = '演示模式';
+    else $('devSub').textContent = S.online ? '在线 · MQTT/TLS 8883' : (S.cfg ? '连接中…' : '未连接');
+  }
+
+  function setTemp(key, v, t, max) {
+    var V = $(key + 'V'), T = $(key + 'T'), B = $(key + 'Bar');
+    V.innerHTML = Math.round(v) + '<em>°</em>';
+    T.textContent = t > 0 ? '目标 ' + Math.round(t) + '°' : '关闭';
+    B.style.width = Math.max(0, Math.min(100, v / max * 100)) + '%';
+  }
+
+  function renderAMS() {
+    var g = $('amsGrid');
+    var list = S.ams && S.ams.length ? S.ams : null;
+    if (!list) {
+      g.innerHTML = '';
+      for (var k = 0; k < 4; k++) {
+        g.innerHTML += '<div class="spool empty"><div class="sdot" style="background:#20272f"></div>' +
+          '<div class="stype" style="color:var(--dim2)">空</div><div class="srem">—</div></div>';
+      }
+      $('amsMeta').textContent = '未检测到 AMS';
+      return;
+    }
+    $('amsMeta').textContent =
+      (S.amsHum != null ? '湿度 ' + S.amsHum + '  ' : '') +
+      (S.amsTemp != null ? '· ' + Math.round(S.amsTemp) + '°C' : '');
+
+    var now = parseInt(S.trayNow, 10);
+    var html = '';
+    for (var i = 0; i < Math.max(4, list.length); i++) {
+      var tray = list[i];
+      if (!tray) {
+        html += '<div class="spool empty"><div class="sdot" style="background:#20272f"></div>' +
+          '<div class="stype" style="color:var(--dim2)">空</div><div class="srem">—</div></div>';
+        continue;
+      }
+      var empty = !tray.type;
+      var col = colorOf(tray.color);
+      var rem = tray.remain;
+      var remTxt = empty ? '空' : (rem >= 0 ? rem + '%' : '未知');
+      html += '<div class="spool' + (i === now ? ' act' : '') + (empty ? ' empty' : '') + '">' +
+        '<div class="sdot" style="background:' + col + '"></div>' +
+        '<div class="stype">' + esc(tray.type || '—') + '</div>' +
+        '<div class="srem num">' + remTxt + '</div>' +
+        '<div class="sbar"><i style="width:' + (rem > 0 ? rem : 0) + '%;background:' + col + '"></i></div>' +
+        '</div>';
+    }
+    g.innerHTML = html;
+  }
+
+  /* ================= 图表 ================= */
+  var cv = $('chart'), ctx = cv.getContext('2d');
+  function drawChart() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (!w) return;
+    if (cv.width !== w * dpr || cv.height !== h * dpr) {
+      cv.width = w * dpr; cv.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    // 网格
+    ctx.strokeStyle = '#1c242d';
+    ctx.lineWidth = 1;
+    for (var i = 1; i <= 3; i++) {
+      var y = (h - 6) / 4 * i + 2;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // 自适应量程：既让冷却时的低温柔可见，也不会把噪声放大成山
+    var all = HIST.n.concat(HIST.b);
+    var tmax = Math.max(S.nozzleT || 0, S.bedT || 0);
+    var hi, lo;
+    if (all.length) {
+      var vmax = all[0], vmin = all[0];
+      for (var q = 1; q < all.length; q++) {
+        if (all[q] > vmax) vmax = all[q];
+        if (all[q] < vmin) vmin = all[q];
+      }
+      hi = Math.max(vmax, tmax) + 12;
+      lo = Math.max(0, vmin - 12);
+      if (hi - lo < 30) { hi = lo + 30; }
+    } else {
+      hi = 60; lo = 0;
+    }
+    var range = hi - lo;
+
+    var pts = HIST.n.length;
+    if (pts < 2) return;
+
+    function yOf(v) {
+      var t = (v - lo) / range;
+      if (t < 0) t = 0; if (t > 1) t = 1;
+      return h - 4 - t * (h - 12);
+    }
+
+    function path(arr, color, fillTo) {
+      var n = arr.length;
+      var span = (n - 1) > 1 ? (n - 1) : 1;
+      ctx.beginPath();
+      for (var i = 0; i < n; i++) {
+        var x = (i / span) * w;
+        var y = yOf(arr[i]);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      if (fillTo) {
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        var gd = ctx.createLinearGradient(0, 0, 0, h);
+        gd.addColorStop(0, hexA(color, .18));
+        gd.addColorStop(1, hexA(color, 0));
+        ctx.fillStyle = gd;
+        ctx.fill();
+      }
+    }
+    path(HIST.b, '#3fa9ff', true);
+    path(HIST.n, '#ff7a45', false);
+
+    // 目标温度虚线
+    function targetLine(t, color) {
+      if (!(t > 0)) return;
+      var y = yOf(t);
+      ctx.save();
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = hexA(color, .5);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      ctx.restore();
+    }
+    targetLine(S.nozzleT, '#ff7a45');
+    targetLine(S.bedT, '#3fa9ff');
+  }
+
+  /* ================= 数据接入 ================= */
+  function applyStatus(print) {
+    if (!print) return;
+    S.online = true;
+    S.lastMsg = Date.now();
+    S.lastError = null;
+
+    if (print.gcode_state) S.state = print.gcode_state;
+    if (typeof print.mc_percent === 'number') S.pct = print.mc_percent;
+    if (typeof print.mc_remaining_time === 'number') S.remain = print.mc_remaining_time;
+    if (typeof print.layer_num === 'number') S.layer = print.layer_num;
+    if (typeof print.total_layer_num === 'number') S.totalLayer = print.total_layer_num;
+    if (typeof print.nozzle_temper === 'number') S.nozzle = print.nozzle_temper;
+    if (typeof print.nozzle_target_temper === 'number') S.nozzleT = print.nozzle_target_temper;
+    if (typeof print.bed_temper === 'number') S.bed = print.bed_temper;
+    if (typeof print.bed_target_temper === 'number') S.bedT = print.bed_target_temper;
+
+    // P2S 常常不带 chamber_temper，腔温在 info.temp 里
+    var ch = print.chamber_temper;
+    if ((ch === undefined || ch === null || ch === 0) && print.info && typeof print.info.temp === 'number') {
+      ch = print.info.temp;
+    }
+    if (typeof ch === 'number') S.chamber = ch;
+
+    if (typeof print.print_error === 'number') S.err = print.print_error;
+    if (typeof print.spd_lvl === 'number') S.speedLvl = print.spd_lvl;
+    S.hms = Array.isArray(print.hms) ? print.hms : [];
+
+    // 舱内灯状态：lights_report 里找 chamber_light
+    if (Array.isArray(print.lights_report)) {
+      for (var li = 0; li < print.lights_report.length; li++) {
+        if (print.lights_report[li].node === 'chamber_light') {
+          S.light = print.lights_report[li].mode || '';
+          break;
+        }
+      }
+    }
+
+    var name = print.subtask_name || print.gcode_file || '';
+    if (name) {
+      name = String(name).split(/[\\/]/).pop();
+      if (!/\.(gcode|3mf)$/i.test(name)) name = name;
+      S.file = name;
+    }
+    if (print.machine_name) { /* 机型名可来自 mqtt */ }
+    if (print.wifi_signal) {
+      var w = parseInt(String(print.wifi_signal).replace('dBm', ''), 10);
+      if (!isNaN(w)) S.wifi = w;
+    }
+
+    // 风扇：取最大的那个（模型/热端风扇）
+    var fans = ['cooling_fan_speed', 'big_fan1_speed', 'big_fan2_speed', 'heatbreak_fan_speed'];
+    var fmax = 0;
+    for (var i = 0; i < fans.length; i++) {
+      var v = parseInt(print[fans[i]], 10);
+      if (!isNaN(v) && v > fmax) fmax = v;
+    }
+    S.fan = fmax;
+
+    // AMS
+    if (print.ams && print.ams.ams && print.ams.ams.length) {
+      var unit = print.ams.ams[0];
+      S.amsHum = unit.humidity != null ? unit.humidity + (unit.humidity !== 'invalid' ? '' : '') : null;
+      var t = parseFloat(unit.temp);
+      S.amsTemp = isNaN(t) ? null : t;
+      var trays = [];
+      for (var j = 0; j < (unit.tray || []).length; j++) {
+        var tr = unit.tray[j];
+        trays.push({
+          type: tr.tray_type && tr.tray_type !== 'unknown' ? tr.tray_type : '',
+          color: tr.tray_color || '',
+          remain: typeof tr.remain === 'number' ? tr.remain : -1
+        });
+      }
+      S.ams = trays;
+      S.trayNow = print.ams.tray_now != null ? String(print.ams.tray_now) : '255';
+    }
+
+    // 机型（来自设备上报的 machine 段，或 mqtt info）
+    if (print.machine_type) S.shape = String(print.machine_type).toUpperCase();
+
+    // 历史
+    HIST.n.push(S.nozzle);
+    HIST.b.push(S.bed);
+    if (HIST.n.length > HIST_MAX) { HIST.n.shift(); HIST.b.shift(); }
+
+    render();
+  }
+
+  /* ================= 传输层 ================= */
+  var Link = {
+    mode: 'none',       // native | ws | demo
+    ws: null,
+    timer: null,
+    connect: function (cfg) {
+      this.stop();
+      if (window.AndroidBridge && window.AndroidBridge.connect) {
+        this.mode = 'native';
+        window.AndroidBridge.connect(cfg.ip, cfg.code, cfg.serial || '');
+      } else if (location.protocol === 'http:' || location.protocol === 'https:') {
+        this.mode = 'ws';
+        this.openWs(cfg);
+      } else {
+        this.mode = 'demo';
+        startDemo();
+      }
+      $('footMode').textContent =
+        this.mode === 'native' ? '原生直连 · MQTT/TLS 8883' :
+        this.mode === 'ws' ? '桥接服务 · MQTT/TLS 8883' : '演示数据';
+    },
+    openWs: function (cfg) {
+      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      var url = proto + location.host + '/ws';
+      var self = this;
+      try { this.ws = new WebSocket(url); } catch (e) { setCfgMsg('无法建立 WebSocket'); return; }
+      this.ws.onopen = function () {
+        self.ws.send(JSON.stringify({
+          type: 'connect', ip: cfg.ip, code: cfg.code, serial: cfg.serial || ''
+        }));
+      };
+      this.ws.onmessage = function (ev) {
+        var msg;
+        try { msg = JSON.parse(ev.data); } catch (e) { return; }
+        handleBridge(msg);
+      };
+      this.ws.onclose = function () {
+        S.online = false; render();
+        if (S.cfg) setTimeout(function () { if (Link.mode === 'ws') Link.openWs(S.cfg); }, 3000);
+      };
+      this.ws.onerror = function () { };
+    },
+    send: function (obj) {
+      if (this.mode === 'ws' && this.ws && this.ws.readyState === 1) {
+        this.ws.send(JSON.stringify({ type: 'command', payload: obj }));
+      } else if (this.mode === 'native' && window.AndroidBridge && window.AndroidBridge.command) {
+        window.AndroidBridge.command(JSON.stringify(obj));
+      }
+    },
+    stop: function () {
+      if (this.ws) { try { this.ws.close(); } catch (e) {} this.ws = null; }
+      if (window.AndroidBridge && window.AndroidBridge.disconnect) window.AndroidBridge.disconnect();
+      stopDemo();
+    }
+  };
+
+  function handleBridge(msg) {
+    if (msg.type === 'status' && msg.print) {
+      applyStatus(msg.print);
+    } else if (msg.type === 'state') {
+      S.online = !!msg.online;
+      if (!S.online) S.state = 'OFFLINE';
+      render();
+    } else if (msg.type === 'error') {
+      S.lastError = msg.message || '连接失败';
+      if (sheet.classList.contains('open')) setCfgMsg(S.lastError);
+      S.online = false;
+      render();
+    } else if (msg.type === 'log') {
+      console.log('[bridge]', msg.message);
+    } else if (msg.type === 'ack') {
+      // 控制命令回执
+      if (msg.verifyFail) {
+        S.auth = false;
+        S.lastError = '打印机拒绝了控制命令：需要在打印机上开启「开发者模式」';
+        showToast('命令被拒：开发者模式未开启', 'no');
+        render();
+      } else if (msg.ok) {
+        S.auth = true;
+        showToast('已执行 · ' + (CMD_NAME[msg.cmd] || msg.cmd), 'ok');
+      } else {
+        // ERROR STATE 之类：状态不允许，不是权限问题
+        showToast('命令未执行 · ' + (msg.reason || '状态不允许'), 'no');
+      }
+    }
+  }
+
+  // 原生回调
+  window.__onBambuData = function (str) {
+    var msg;
+    try { msg = JSON.parse(str); } catch (e) { return; }
+    handleBridge(msg);
+  };
+
+  /* ================= 演示数据 ================= */
+  var demoTimer = null, demoP = 0;
+  function startDemo() {
+    stopDemo();
+    demoP = 37;
+    S.online = true;
+    S.state = 'RUNNING';
+    S.totalLayer = 268; S.layer = 99;
+    S.nozzleT = 220; S.bedT = 60;
+    S.file = 'Benchy_P2S_0.2mm_PLA.3mf';
+    S.shape = 'P2S';
+    S.wifi = -48;
+    S.speedLvl = 2;
+    S.fan = 70;
+    S.chamber = 32.4;
+    S.amsHum = '3';
+    S.amsTemp = 28;
+    S.trayNow = '0';
+    S.ams = [
+      { type: 'PLA', color: 'E8E8E8FF', remain: 82 },
+      { type: 'PETG', color: '1A6BD8FF', remain: 46 },
+      { type: 'PLA', color: 'D8342BFF', remain: 15 },
+      { type: 'PLA-CF', color: '2B2B2BFF', remain: 67 }
+    ];
+    demoTimer = setInterval(function () {
+      demoP = Math.min(100, demoP + 0.28);
+      S.pct = demoP;
+      S.layer = Math.round(99 + demoP / 100 * 169);
+      S.remain = Math.round((100 - demoP) * 1.9);
+      S.nozzle = 219.4 + Math.sin(Date.now() / 900) * 1.4;
+      S.bed = 59.7 + Math.sin(Date.now() / 1500) * 0.5;
+      S.chamber = 32 + Math.sin(Date.now() / 4000) * 0.8;
+      S.fan = 70 + Math.round(Math.sin(Date.now() / 1200) * 2);
+      HIST.n.push(S.nozzle); HIST.b.push(S.bed);
+      if (HIST.n.length > HIST_MAX) { HIST.n.shift(); HIST.b.shift(); }
+      if (demoP >= 100) { S.state = 'FINISH'; }
+      render();
+    }, 1000);
+  }
+  function stopDemo() { if (demoTimer) { clearInterval(demoTimer); demoTimer = null; } }
+
+  /* ================= 工具 ================= */
+  function hexA(hex, a) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+  function colorOf(c) {
+    if (!c || c.length < 6) return '#20272f';
+    var h = c.substring(0, 6);
+    if (h.toLowerCase() === '000000') return '#2a2a2a';
+    return '#' + h;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+  function fmtRemain(min) {
+    if (min <= 0) return '即将完成';
+    if (min < 60) return min + ' 分钟';
+    var h = Math.floor(min / 60), m = min % 60;
+    return h + ' 小时' + (m ? ' ' + m + ' 分' : '');
+  }
+  function fmtClock(min) {
+    var d = new Date(Date.now() + min * 60000);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function setCfgMsg(t) { $('cfgMsg').textContent = t || ''; }
+
+  /* ================= 交互 ================= */
+  var sheet = $('cfgSheet');
+  function openCfg() {
+    var c = S.cfg || {};
+    $('inIp').value = c.ip || '';
+    $('inCode').value = c.code || '';
+    $('inSerial').value = c.serial || '';
+    setCfgMsg('');
+    sheet.classList.add('open');
+    setTimeout(function () { $('inIp').focus(); }, 120);
+  }
+  function closeCfg() { sheet.classList.remove('open'); }
+
+  $('btnCfg').onclick = openCfg;
+  $('btnCancel').onclick = closeCfg;
+  $('btnDemo').onclick = function () {
+    closeCfg();
+    S.cfg = null;
+    Link.stop();
+    Link.mode = 'demo';
+    startDemo();
+    $('devName').textContent = 'P2S 看板';
+    $('devSub').textContent = '演示模式';
+    $('footMode').textContent = '演示数据';
+  };
+
+  $('btnSave').onclick = function () {
+    var ip = $('inIp').value.trim();
+    var code = $('inCode').value.trim();
+    if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { setCfgMsg('IP 格式不对，示例 192.168.1.100'); return; }
+    if (code.length < 4) { setCfgMsg('访问码至少 8 位，请照打印机屏幕填'); return; }
+    var cfg = { ip: ip, code: code, serial: $('inSerial').value.trim() };
+    S.cfg = cfg;
+    try { localStorage.setItem('bambu_cfg', JSON.stringify(cfg)); } catch (e) {}
+    if (window.AndroidBridge && window.AndroidBridge.saveConfig) {
+      try { window.AndroidBridge.saveConfig(cfg.ip, cfg.code, cfg.serial); } catch (e) {}
+    }
+    $('devName').textContent = 'P2S · ' + ip;
+    $('devSub').textContent = '连接中…';
+    closeCfg();
+    Link.connect(cfg);
+  };
+
+  $('btnPause').onclick = function () { sendCmd('pause'); };
+  $('btnResume').onclick = function () { sendCmd('resume'); };
+  $('btnStop').onclick = function () {
+    if (!confirm('确认停止当前打印？')) return;
+    sendCmd('stop');
+  };
+  function sendCmd(cmd) {
+    if (!S.auth && !confirm(
+      '打印机上次拒收了控制命令（开发者模式未开）。\n' +
+      '这条大概率也会被拒，并在打印机屏幕上再记一条「MQTT 命令校验失败」。\n\n' +
+      '仍要发送吗？'
+    )) return;
+    var seq = String(Date.now()).slice(-6);
+    var body = { print: { sequence_id: seq, command: cmd, param: '' } };
+    if (cmd === 'stop') body.print.param = '';
+    Link.send(body);
+  }
+
+  /* ================= toast ================= */
+  var toastTimer = null;
+  function showToast(text, kind) {
+    var t = $('toast');
+    t.textContent = text;
+    t.className = 'show' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = ''; }, 2600);
+  }
+
+  /* ================= 舱内灯 ================= */
+  $('btnLight').onclick = function () {
+    var on = S.light !== 'on';
+    Link.send({
+      system: {
+        sequence_id: String(Date.now()).slice(-6),
+        command: 'ledctrl',
+        led_node: 'chamber_light',
+        led_mode: on ? 'on' : 'off',
+        led_on_time: 500, led_off_time: 500,
+        loop_times: 1, interval_time: 1000
+      }
+    });
+    S.light = on ? 'on' : 'off';       // 乐观更新，状态推送回来会纠正
+    render();
+    showToast(on ? '舱内灯已开' : '舱内灯已关');
+  };
+
+  /* ================= 摄像头 ================= */
+  var camTimer = null;
+  // APK 里 WebView 播不了 RTSP，交给原生层：隧道 + MediaPlayer 全屏播放
+  var camNative = !!(window.AndroidBridge && window.AndroidBridge.camSupported &&
+                     window.AndroidBridge.camSupported());
+  function camRender() {
+    $('camImg').style.display = S.camOn ? 'block' : 'none';
+    $('camPh').style.display = S.camOn ? 'none' : 'flex';
+    $('camBadge').style.display = S.camOn ? 'block' : 'none';
+    $('camMeta').textContent = camNative ? '点击全屏' : (S.camOn ? '点击关闭' : '点击开启');
+  }
+  function camStart() {
+    if (camNative) {
+      if (!S.cfg || !S.cfg.ip) { showToast('请先连接打印机', 'no'); return; }
+      window.AndroidBridge.camStart(S.cfg.ip, S.cfg.code);
+      return;
+    }
+    if (S.camOn) return;
+    S.camOn = true;
+    camRender();
+    var img = $('camImg');
+    img.onerror = function () {
+      camStop();
+      showToast('摄像头连接失败，确认已开「局域网模式实况」', 'no');
+    };
+    // 浏览器原生支持 multipart/x-mixed-replace
+    img.src = '/api/cam.mjpg?w=640&fps=12&t=' + Date.now();
+  }
+  function camStop() {
+    if (camNative) { window.AndroidBridge.camStop(); return; }
+    S.camOn = false;
+    clearTimeout(camTimer);
+    var img = $('camImg');
+    img.onerror = null;
+    img.removeAttribute('src');
+    camRender();
+  }
+  $('camPh').onclick = function () { S.camOn ? camStop() : camStart(); };
+  $('camMeta').onclick = function () { S.camOn ? camStop() : camStart(); };
+
+  /* ================= 启动 ================= */
+  try {
+    var dz = JSON.parse(localStorage.getItem('bam_dismissed') || '{}');
+    if (dz && typeof dz === 'object') S.dismissed = dz;
+  } catch (e) {}
+  window.addEventListener('resize', function () { drawChart(); });
+  setInterval(function () {
+    // 心跳检测：超过 12 秒没数据判离线
+    if (S.online && S.cfg && Date.now() - S.lastMsg > 12000) {
+      S.online = false; S.state = 'OFFLINE'; render();
+    }
+    drawChart();
+  }, 2000);
+
+  // 自动重连：优先 URL 参数，其次 localStorage
+  var qs = new URLSearchParams(location.search);
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem('bambu_cfg') || 'null'); } catch (e) {}
+  // APK 里以原生存储为准（file:// 下 localStorage 不可靠）
+  if (window.AndroidBridge && window.AndroidBridge.getSavedConfig) {
+    try {
+      var raw = window.AndroidBridge.getSavedConfig();
+      if (raw) saved = JSON.parse(raw);
+    } catch (e) {}
+  }
+
+  if (qs.get('ip') && qs.get('code')) {
+    // 直连链接：?ip=192.168.1.100&code=xxxxxxxx
+    saved = { ip: qs.get('ip'), code: qs.get('code'), serial: qs.get('serial') || '' };
+    S.cfg = saved;
+    $('devName').textContent = 'P2S · ' + saved.ip;
+    $('devSub').textContent = '连接中…';
+    Link.connect(saved);
+  } else if (qs.get('demo') === '1') {
+    Link.mode = 'demo';
+    startDemo();
+    $('devSub').textContent = '演示模式';
+    $('footMode').textContent = '演示数据';
+  } else if (saved && saved.ip) {
+    S.cfg = saved;
+    $('devName').textContent = 'P2S · ' + saved.ip;
+    $('devSub').textContent = '连接中…';
+    Link.connect(saved);
+  } else {
+    Link.mode = 'demo';
+    startDemo();
+    $('devSub').textContent = '演示模式';
+    $('footMode').textContent = '演示数据';
+    setTimeout(openCfg, 400);
+  }
+  render();
+  setTimeout(drawChart, 60);
+})();
+</script>
+</body>
+</html>
