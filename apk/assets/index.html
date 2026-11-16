@@ -916,11 +916,14 @@
     if (typeof print.bed_temper === 'number') S.bed = print.bed_temper;
     if (typeof print.bed_target_temper === 'number') S.bedT = print.bed_target_temper;
 
-    // P2S 常常不带 chamber_temper，腔温在 info.temp 里
+    // 腔温：不同机型放的地方不一样，逐个试
+    //   chamber_temper        部分机型顶层就有
+    //   info.temp             P1 / P2 / A 系列
+    //   device.ctc.info.temp  X1 / H2 系列
     var ch = print.chamber_temper;
-    if ((ch === undefined || ch === null || ch === 0) && print.info && typeof print.info.temp === 'number') {
-      ch = print.info.temp;
-    }
+    if (!(ch > 0) && print.info && typeof print.info.temp === 'number') ch = print.info.temp;
+    if (!(ch > 0) && print.device && print.device.ctc && print.device.ctc.info &&
+        typeof print.device.ctc.info.temp === 'number') ch = print.device.ctc.info.temp;
     if (typeof ch === 'number') S.chamber = ch;
 
     if (typeof print.print_error === 'number') S.err = print.print_error;
